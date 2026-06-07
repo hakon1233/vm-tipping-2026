@@ -19,7 +19,7 @@ let apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 async function loadConfig() {
   try {
     const base = import.meta.env.BASE_URL ?? "/";
-    const res = await fetch(`${base}config.json`);
+    const res = await fetch(`${base}config.json`, { cache: "no-store" });
     if (res.ok) {
       const cfg = (await res.json()) as { apiBaseUrl?: string };
       if (cfg.apiBaseUrl) apiBaseUrl = cfg.apiBaseUrl;

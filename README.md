@@ -44,7 +44,7 @@ Players, teams, groups and scoring are seeded from the original spreadsheet — 
 
 ## Status
 
-MVP in progress — built by a Paperclip company (engineer on gpt-5.5). See [`SPEC.md`](SPEC.md).
+MVP in progress — built by a Paperclip company (engineer on Claude Opus 4.8). See [`SPEC.md`](SPEC.md).
 
 ## Layout
 

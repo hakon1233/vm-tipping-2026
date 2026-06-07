@@ -1,0 +1,42 @@
+{
+  "tournament": "World Cup 2026",
+  "title": "VM-tipping 2026 — Friends Prediction League",
+  "players": [
+    "Bendik",
+    "Erlend",
+    "Ingvild",
+    "Laila",
+    "Marte",
+    "Nils Erland",
+    "Odd Gunnar",
+    "Ragnhild"
+  ],
+  "groups": {
+    "A": ["Mexico", "South Africa", "South Korea", "Czech Republic"],
+    "B": ["Canada", "Bosnia and Herzegovina", "Qatar", "Switzerland"],
+    "C": ["Brazil", "Morocco", "Haiti", "Scotland"],
+    "D": ["United States", "Paraguay", "Australia", "Turkey"],
+    "E": ["Germany", "Curacao", "Ivory Coast", "Ecuador"],
+    "F": ["Netherlands", "Japan", "Sweden", "Tunisia"],
+    "G": ["Belgium", "Egypt", "Iran", "New Zealand"],
+    "H": ["Spain", "Cape Verde", "Saudi Arabia", "Uruguay"],
+    "I": ["France", "Senegal", "Iraq", "Norway"],
+    "J": ["Argentina", "Algeria", "Austria", "Jordan"],
+    "K": ["Portugal", "DR Congo", "Uzbekistan", "Colombia"],
+    "L": ["England", "Croatia", "Ghana", "Panama"]
+  },
+  "scoring": {
+    "groupGame": 1,
+    "r32Team": 2,
+    "r16Team": 3,
+    "qfTeam": 4,
+    "sfTeam": 5,
+    "finalTeam": 6,
+    "champion": 7
+  },
+  "rules": {
+    "groupStage": "Each player predicts every group game as 1 (team 1 wins), X (draw) or 2 (team 2 wins). 1 point per correct result.",
+    "knockout": "Each player picks the teams they think reach each round. Points awarded per correct team per round (see scoring). Picking the same team twice in a round scores only once.",
+    "lockPolicy": "Players should lock in all picks before kickoff; admin enters real results/qualifiers as the tournament progresses."
+  }
+}

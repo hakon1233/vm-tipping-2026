@@ -12,7 +12,25 @@ import {
   writeKnockoutPicks
 } from "./lib/knockout";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+// apiBaseUrl is loaded at runtime from /config.json so the tunnel URL
+// can be updated without a full rebuild+redeploy.
+let apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+
+async function loadConfig() {
+  try {
+    const base = import.meta.env.BASE_URL ?? "/";
+    const res = await fetch(`${base}config.json`);
+    if (res.ok) {
+      const cfg = (await res.json()) as { apiBaseUrl?: string };
+      if (cfg.apiBaseUrl) apiBaseUrl = cfg.apiBaseUrl;
+    }
+  } catch {
+    // keep the baked-in default
+  }
+}
+
+const configLoaded = loadConfig();
+
 const sessionKey = "vm-tipping-session";
 const groupLetters = Object.keys(seed.groups) as GroupLetter[];
 const allTeams = Object.values(seed.groups).flat();
@@ -46,6 +64,20 @@ function useRoute(): string {
 
 export function App() {
   const route = useRoute();
+  const [configReady, setConfigReady] = useState(false);
+
+  useEffect(() => {
+    void configLoaded.then(() => setConfigReady(true));
+  }, []);
+
+  if (!configReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-paper text-ink">
+        <p className="text-ink/50">Loading…</p>
+      </main>
+    );
+  }
+
   const page =
     route === "/admin" ? <AdminPage /> : route === "/leaderboard" ? <LeaderboardPage /> : <PlayerPage />;
   return (
@@ -272,11 +304,17 @@ function PlayerPage() {
 
   async function login(name: string, pin: string) {
     setError(null);
-    const response = await fetch(`${apiBaseUrl}/api/login`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, pin })
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${apiBaseUrl}/api/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, pin })
+      });
+    } catch {
+      setError("Could not reach the server. Check your connection.");
+      return;
+    }
 
     if (!response.ok) {
       setError("Name or league PIN was not accepted.");
@@ -302,11 +340,17 @@ function PlayerPage() {
     if (!name) return;
     setNameError(null);
 
-    const response = await fetch(`${apiBaseUrl}/api/player/name`, {
-      method: "PATCH",
-      headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
-      body: JSON.stringify({ name })
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${apiBaseUrl}/api/player/name`, {
+        method: "PATCH",
+        headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+    } catch {
+      setNameError("Could not reach the server.");
+      return;
+    }
 
     if (!response.ok) {
       const body = (await response.json()) as { error?: string };
@@ -336,14 +380,21 @@ function PlayerPage() {
   async function savePick(matchId: string, pick: GroupPickOutcome) {
     if (!session) return;
 
-    const response = await fetch(`${apiBaseUrl}/api/picks`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${session.token}`,
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({ matchId, pick })
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${apiBaseUrl}/api/picks`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ matchId, pick })
+      });
+    } catch {
+      setSaveState("error");
+      setError("Could not reach the server.");
+      return;
+    }
 
     if (!response.ok) {
       setSaveState("error");
@@ -485,7 +536,17 @@ function AdminPage() {
   const [status, setStatus] = useState("Locked");
 
   async function loadState() {
-    const response = await fetch(`${apiBaseUrl}/api/admin/state`);
+    let response: Response;
+    try {
+      response = await fetch(`${apiBaseUrl}/api/admin/state`);
+    } catch {
+      setStatus("Error: could not reach server");
+      return;
+    }
+    if (!response.ok) {
+      setStatus("Error: " + response.status);
+      return;
+    }
     const body = (await response.json()) as AdminState;
     setState(body);
     setStatus("Loaded");
@@ -823,7 +884,6 @@ function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
           <strong className="text-2xl text-ink">
             {completedSlots}/{totalSlots}
           </strong>
-          <span className="font-mono text-xs text-ink/50">API {apiBaseUrl}</span>
         </div>
       </header>
 

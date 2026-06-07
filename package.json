@@ -1,0 +1,26 @@
+{
+  "name": "vm-tipping-2026",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "web",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -n shared,server,web -c blue,green,magenta \"npm run dev -w @vm-tipping-2026/shared\" \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w @vm-tipping-2026/shared && npm run build -w server && npm run build -w web",
+    "start": "npm run start -w server",
+    "test": "vitest run && npm run test -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "hono": "^4.12.23"
+  }
+}

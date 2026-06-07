@@ -50,7 +50,36 @@ MVP in progress — built by a Paperclip company (engineer on gpt-5.5). See [`SP
 
 ```
 data/seed.json   players, groups, teams, scoring (from the Excel)
-web/             frontend SPA (to build)
-server/          mac mini API + SQLite (to build)
+web/             Vite + React + TypeScript + Tailwind frontend
+server/          Hono + TypeScript + SQLite API
+shared/          shared TypeScript types and match helpers
 SPEC.md          MVP feature spec
 ```
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` starts:
+
+- Web: http://localhost:5173
+- API: http://localhost:3000
+
+Copy `.env.example` to `.env` and set:
+
+- `VITE_API_BASE_URL` for the web app API URL
+- `ADMIN_PIN` for admin result/scoring routes
+- `LEAGUE_PIN` for player login
+
+Useful commands:
+
+```bash
+npm test
+npm run build
+npm start
+```
+
+`npm start` runs the built API server from `server/dist`.

@@ -1,11 +1,31 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.history.pushState({}, "", "/");
+});
 
 describe("Knockout page", () => {
   beforeEach(() => {
+    window.history.pushState({}, "", "/");
     window.localStorage.clear();
+    window.localStorage.setItem(
+      "vm-tipping-session",
+      JSON.stringify({ token: "test-token", playerId: "player-1", playerName: "Bendik" })
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        return {
+          ok: true,
+          json: async () => (url.includes("/api/picks/") ? { group: {} } : { matches: [] })
+        };
+      })
+    );
   });
 
   it("renders all knockout rounds and a champion selector", () => {

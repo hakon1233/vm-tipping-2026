@@ -66,7 +66,7 @@ describe("Knockout page", () => {
 
 describe("Admin page", () => {
   beforeEach(() => {
-    window.history.pushState({}, "", "/admin");
+    window.history.pushState({}, "", "/#/admin");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({

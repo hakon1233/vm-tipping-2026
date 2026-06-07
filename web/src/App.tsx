@@ -26,14 +26,59 @@ type Session = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+// Hash-based routing so the SPA works on a static host (GitHub Pages) under any
+// base path, with deep links and refresh surviving — no server rewrite rules needed.
+// Routes: #/ → player picks, #/leaderboard → public leaderboard, #/admin → admin.
+function getRoute(): string {
+  const hash = window.location.hash.replace(/^#/, "");
+  return (hash || "/").replace(/\/+$/, "") || "/";
+}
+
+function useRoute(): string {
+  const [route, setRoute] = useState(getRoute());
+  useEffect(() => {
+    const onChange = () => setRoute(getRoute());
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return route;
+}
+
 export function App() {
-  if (window.location.pathname === "/admin") {
-    return <AdminPage />;
-  }
-  if (window.location.pathname === "/leaderboard") {
-    return <LeaderboardPage />;
-  }
-  return <PlayerPage />;
+  const route = useRoute();
+  const page =
+    route === "/admin" ? <AdminPage /> : route === "/leaderboard" ? <LeaderboardPage /> : <PlayerPage />;
+  return (
+    <>
+      {page}
+      {route === "/admin" ? null : <RouteNav route={route} />}
+    </>
+  );
+}
+
+function RouteNav({ route }: { route: string }) {
+  const links = [
+    { href: "#/", label: "Picks", match: route === "/" },
+    { href: "#/leaderboard", label: "Leaderboard", match: route === "/leaderboard" }
+  ];
+  return (
+    <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4" aria-label="Primary">
+      <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-white/95 p-1 shadow-lg backdrop-blur">
+        {links.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            aria-current={link.match ? "page" : undefined}
+            className={`min-h-10 rounded-full px-5 text-sm font-bold transition ${
+              link.match ? "bg-pitch text-white" : "text-ink/70 hover:bg-ink/5"
+            } inline-flex items-center`}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
 }
 
 type LeaderboardRow = {
@@ -89,7 +134,7 @@ function LeaderboardPage() {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 pb-24 sm:px-6 lg:px-8">
         <header className="grid gap-4 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
@@ -291,7 +336,7 @@ function PlayerPage() {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 pb-24 sm:px-6 lg:px-8">
         <header className="grid gap-5 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>

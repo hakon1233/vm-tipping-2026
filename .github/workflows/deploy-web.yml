@@ -1,0 +1,54 @@
+name: Deploy web to GitHub Pages
+
+# Builds the static SPA in /web and publishes it to the PUBLIC deploy repo
+# (e.g. hakon1233/vm-tipping-2026-web), which serves it on GitHub Pages. This
+# source repo is private, so Pages is hosted from the separate public repo.
+#
+# One-time setup by the founder (see README "Deploy" section):
+#   Repo variables (Settings → Secrets and variables → Actions → Variables):
+#     DEPLOY_REPO     owner/name of the public deploy repo  (default below)
+#     VITE_BASE_PATH  Pages subpath, e.g. /vm-tipping-2026-web/  (default below)
+#   Repo secrets (Settings → Secrets and variables → Actions → Secrets):
+#     VITE_API_BASE_URL  the Cloudflare tunnel HTTPS URL of the mac mini API
+#     DEPLOY_TOKEN       a PAT (repo scope) that can push to the public deploy repo
+#
+# Then enable GitHub Pages on the PUBLIC repo: Settings → Pages → Deploy from
+# branch → gh-pages / root.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "shared/**"
+      - "data/seed.json"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build web
+        env:
+          VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/vm-tipping-2026-web/' }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: npm run build -w @vm-tipping-2026/shared && npm run build -w web
+
+      - name: Publish to public Pages repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: ${{ vars.DEPLOY_REPO || 'hakon1233/vm-tipping-2026-web' }}
+          publish_branch: gh-pages
+          publish_dir: ./web/dist
+          cname: ${{ vars.PAGES_CNAME }}

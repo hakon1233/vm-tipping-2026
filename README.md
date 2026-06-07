@@ -83,3 +83,90 @@ npm start
 ```
 
 `npm start` runs the built API server from `server/dist`.
+
+## Routing
+
+The SPA is a static site and uses **hash routing** so it works on GitHub Pages with no
+server rewrite rules (deep links and refresh just work):
+
+- `#/` — player picks (group stage + knockout), login-gated
+- `#/leaderboard` — public leaderboard
+- `#/admin` — admin (PIN-gated)
+
+A floating bottom nav links Picks ↔ Leaderboard. Admin is reachable by URL.
+
+## Deploy
+
+Architecture: the **frontend** is a static SPA served by GitHub Pages from a separate
+**public** repo (this source repo is private). The **backend** runs on the mac mini and
+is exposed over HTTPS by a Cloudflare tunnel. The Pages site calls the tunnel URL.
+
+### Backend — mac mini
+
+```bash
+# one-time
+git clone git@github.com:hakon1233/vm-tipping-2026.git
+cd vm-tipping-2026
+npm install
+npm run build                       # builds shared + server + web
+
+# configure
+cp .env.example .env                # set ADMIN_PIN and LEAGUE_PIN to real values
+
+# run the API (serves on :3000, SQLite persisted at data/vm-tipping.sqlite)
+ADMIN_PIN=… LEAGUE_PIN=… npm start
+```
+
+Keep it running across restarts with `pm2` (or a launchd plist):
+
+```bash
+npm i -g pm2
+pm2 start "npm start" --name vm-tipping-api
+pm2 save && pm2 startup            # follow the printed command to enable on boot
+```
+
+### Cloudflare tunnel (HTTPS for the API)
+
+```bash
+brew install cloudflared
+cloudflared tunnel login                       # authorise once
+cloudflared tunnel create vm-tipping
+# Route a hostname you control to the tunnel, then point it at the local API:
+cloudflared tunnel route dns vm-tipping api.example.com
+cloudflared tunnel run --url http://localhost:3000 vm-tipping
+```
+
+Quick test without a domain (gives an ephemeral `*.trycloudflare.com` URL):
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Use the resulting HTTPS URL as `VITE_API_BASE_URL` for the frontend build. CORS is open
+on the API, so the Pages origin can call it directly.
+
+### Frontend — GitHub Pages
+
+A workflow (`.github/workflows/deploy-web.yml`) builds `/web` and publishes it to the
+public deploy repo on every push to `main` that touches the frontend.
+
+One-time setup:
+
+1. Create the public repo `hakon1233/vm-tipping-2026-web` (empty is fine).
+2. In **this** repo → Settings → Secrets and variables → Actions:
+   - **Variables**: `DEPLOY_REPO` = `hakon1233/vm-tipping-2026-web`,
+     `VITE_BASE_PATH` = `/vm-tipping-2026-web/` (the Pages subpath).
+   - **Secrets**: `VITE_API_BASE_URL` = the Cloudflare tunnel HTTPS URL,
+     `DEPLOY_TOKEN` = a PAT with `repo` scope that can push to the public repo.
+3. In the **public** repo → Settings → Pages → Deploy from branch → `gh-pages` / root.
+4. Push to `main` (or run the workflow manually) — the SPA lands at
+   `https://hakon1233.github.io/vm-tipping-2026-web/`.
+
+> Using a custom domain or a user/org Pages root instead? Set `VITE_BASE_PATH=/` and add
+> the `PAGES_CNAME` variable.
+
+### Smoke test (end-to-end)
+
+Verified locally against the built server: player login → submit a group pick → admin
+enters that match's result → leaderboard reflects the point. In production, run the same
+flow against the deployed Pages site once the tunnel URL is wired.

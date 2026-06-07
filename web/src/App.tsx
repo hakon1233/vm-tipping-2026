@@ -1,4 +1,4 @@
-import { Check, Crown, Lock, LockKeyhole, RefreshCw, Save, ShieldCheck, Trophy } from "lucide-react";
+import { Check, Crown, Lock, LockKeyhole, Pencil, RefreshCw, Save, ShieldCheck, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import seed from "../../data/seed.json";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
@@ -231,17 +231,24 @@ function LeaderboardPage() {
 
 function PlayerPage() {
   const [session, setSession] = useState<Session | null>(() => readSession());
+  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupPicks, setGroupPicks] = useState<Record<string, GroupPickOutcome>>({});
   const [activeGroup, setActiveGroup] = useState<GroupLetter>("A");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
   const saveTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
       .then((response) => response.json())
-      .then((payload: { matches: Match[] }) => setMatches(payload.matches))
+      .then((payload: { matches: Match[]; players?: { id: string; name: string }[] }) => {
+        setMatches(payload.matches);
+        if (payload.players) setPlayers(payload.players);
+      })
       .catch(() => setError("Match schedule could not be loaded."));
   }, []);
 
@@ -289,6 +296,32 @@ function PlayerPage() {
     setSession(nextSession);
   }
 
+  async function saveName() {
+    if (!session) return;
+    const name = nameInput.trim();
+    if (!name) return;
+    setNameError(null);
+
+    const response = await fetch(`${apiBaseUrl}/api/player/name`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+
+    if (!response.ok) {
+      const body = (await response.json()) as { error?: string };
+      setNameError(body.error ?? "Could not save name.");
+      return;
+    }
+
+    const updated = { ...session, playerName: name };
+    localStorage.setItem(sessionKey, JSON.stringify(updated));
+    setSession(updated);
+    setPlayers((prev) => prev.map((p) => (p.id === session.playerId ? { ...p, name } : p)));
+    setEditingName(false);
+    setNameError(null);
+  }
+
   function queuePickSave(match: Match, pick: GroupPickOutcome) {
     if (!session || isLocked(match)) return;
 
@@ -329,7 +362,7 @@ function PlayerPage() {
   }
 
   if (!session) {
-    return <LoginScreen error={error} onLogin={login} />;
+    return <LoginScreen error={error} players={players} onLogin={login} />;
   }
 
   const pickedCount = Object.keys(groupPicks).length;
@@ -343,10 +376,37 @@ function PlayerPage() {
             <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Group-stage picks</h1>
           </div>
           <div className="grid min-w-52 gap-2 rounded-md border border-ink/10 bg-paper p-4 text-sm text-ink/70">
-            <div className="flex items-center gap-2 font-semibold text-pitch">
-              <Trophy size={18} aria-hidden="true" />
-              <span>{session.playerName}</span>
-            </div>
+            {editingName ? (
+              <div className="grid gap-2">
+                <input
+                  autoFocus
+                  className="min-h-10 rounded-md border border-ink/20 bg-white px-3 text-base text-ink"
+                  maxLength={50}
+                  placeholder="Your name"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void saveName(); if (e.key === "Escape") setEditingName(false); }}
+                />
+                {nameError ? <p className="text-xs font-semibold text-red-700">{nameError}</p> : null}
+                <div className="flex gap-2">
+                  <button className="flex-1 min-h-9 rounded-md bg-pitch text-xs font-black text-white" onClick={() => void saveName()} type="button">Save</button>
+                  <button className="min-h-9 rounded-md border border-ink/20 px-3 text-xs font-bold" onClick={() => { setEditingName(false); setNameError(null); }} type="button">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 font-semibold text-pitch">
+                <Trophy size={18} aria-hidden="true" />
+                <span>{session.playerName}</span>
+                <button
+                  aria-label="Edit name"
+                  className="ml-auto text-ink/40 hover:text-ink"
+                  onClick={() => { setNameInput(session.playerName); setEditingName(true); }}
+                  type="button"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+            )}
             <strong className="text-2xl text-ink">{pickedCount}/72</strong>
             <SaveIndicator state={saveState} />
             <button className="text-left text-sm font-bold text-red-700" onClick={logout} type="button">
@@ -601,13 +661,23 @@ function AdminPage() {
 
 function LoginScreen({
   error,
+  players,
   onLogin
 }: {
   error: string | null;
+  players: { id: string; name: string }[];
   onLogin: (name: string, pin: string) => void;
 }) {
-  const [name, setName] = useState(seed.players[0]);
+  const displayPlayers = players.length > 0 ? players : seed.players.map((n, i) => ({ id: `player-${i + 1}`, name: n }));
+  const [name, setName] = useState(displayPlayers[0]?.name ?? "");
   const [pin, setPin] = useState("");
+
+  // keep selected name in sync when the player list loads
+  useEffect(() => {
+    if (players.length > 0 && !players.find((p) => p.name === name)) {
+      setName(players[0].name);
+    }
+  }, [players]);
 
   return (
     <main className="grid min-h-screen place-items-center bg-paper px-4 text-ink">
@@ -622,15 +692,15 @@ function LoginScreen({
           }}
         >
           <label className="grid gap-2 text-sm font-bold text-ink/70">
-            Name
+            Player
             <select
               className="min-h-12 rounded-md border border-ink/20 bg-paper px-3 text-base text-ink"
               value={name}
               onChange={(event) => setName(event.target.value)}
             >
-              {seed.players.map((player) => (
-                <option key={player} value={player}>
-                  {player}
+              {displayPlayers.map((player) => (
+                <option key={player.id} value={player.name}>
+                  {player.name}
                 </option>
               ))}
             </select>

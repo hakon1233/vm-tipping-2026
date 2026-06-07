@@ -126,6 +126,25 @@ export function createApp(options: AppOptions = {}) {
     return context.json({ error: "Invalid pick payload" }, 400);
   });
 
+  app.patch("/api/player/name", async (context) => {
+    const playerId = authenticate(context.req.header("authorization"), sessions);
+    if (!playerId) return context.json({ error: "Unauthorized" }, 401);
+
+    const body = await context.req.json<{ name?: string }>();
+    const name = body.name?.trim();
+    if (!name || name.length < 1 || name.length > 50) {
+      return context.json({ error: "Name must be 1–50 characters" }, 400);
+    }
+
+    try {
+      store.updatePlayerName(playerId, name);
+    } catch {
+      return context.json({ error: "Name already taken" }, 409);
+    }
+
+    return context.json({ ok: true, player: store.getPlayerById(playerId) });
+  });
+
   app.get("/api/picks/:playerId", (context) => {
     const playerId = context.req.param("playerId");
     const player = store.getPlayerById(playerId);

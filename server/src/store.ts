@@ -90,6 +90,11 @@ export function createStore(options: StoreOptions) {
     listPlayers: () => db.prepare("SELECT id, name FROM players ORDER BY id").all() as Player[],
     getPlayerByName: (name: string) => db.prepare("SELECT id, name FROM players WHERE name = ?").get(name) as Player | undefined,
     getPlayerById: (id: string) => db.prepare("SELECT id, name FROM players WHERE id = ?").get(id) as Player | undefined,
+    updatePlayerName: (playerId: string, newName: string) => {
+      const conflict = db.prepare("SELECT id FROM players WHERE name = ? AND id != ?").get(newName, playerId);
+      if (conflict) throw new Error("Name already taken");
+      db.prepare("UPDATE players SET name = ? WHERE id = ?").run(newName, playerId);
+    },
     listTeams: () => db.prepare("SELECT id, name, group_name AS 'group' FROM teams ORDER BY group_name, name").all() as Team[],
     listMatches: () =>
       db

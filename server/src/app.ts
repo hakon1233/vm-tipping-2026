@@ -52,7 +52,8 @@ export function createApp(options: AppOptions = {}) {
         { id: "sf", label: "Semi-finals" },
         { id: "final", label: "Final" },
         { id: "champion", label: "Champion" }
-      ]
+      ],
+      advancement: store.getGroupAdvancement()
     })
   );
   app.get("/api/leaderboard", (context) => context.json({ leaderboard: store.getLeaderboard() }));
@@ -72,7 +73,8 @@ export function createApp(options: AppOptions = {}) {
         ])
       ),
       champion: store.getActualChampion() ?? null,
-      leaderboard: store.getLeaderboard()
+      leaderboard: store.getLeaderboard(),
+      advancement: store.getGroupAdvancement()
     })
   );
 
@@ -195,6 +197,20 @@ export function createApp(options: AppOptions = {}) {
 
     store.saveActualChampion(team);
     return context.json({ ok: true, champion: store.getActualChampion() });
+  });
+
+  app.post("/api/admin/advancement", async (context) => {
+    const body = await context.req.json<{ adminPin?: string; group?: string; position?: number; team?: string }>();
+    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
+      return context.json({ error: "Invalid admin PIN" }, 401);
+    }
+    const group = body.group?.toUpperCase();
+    const position = body.position;
+    if (!group || (position !== 1 && position !== 2) || !body.team) {
+      return context.json({ error: "Invalid advancement payload" }, 400);
+    }
+    store.saveGroupAdvancement(group, position as 1 | 2, body.team);
+    return context.json({ ok: true, advancement: store.getGroupAdvancement() });
   });
 
   app.post("/api/admin/scoring", async (context) => {

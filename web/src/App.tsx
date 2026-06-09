@@ -272,14 +272,16 @@ function PlayerPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const [advancement, setAdvancement] = useState<Record<string, { first?: string; second?: string }>>({});
   const saveTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
       .then((response) => response.json())
-      .then((payload: { matches: Match[]; players?: { id: string; name: string }[] }) => {
+      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string }> }) => {
         setMatches(payload.matches);
         if (payload.players) setPlayers(payload.players);
+        if (payload.advancement) setAdvancement(payload.advancement);
       })
       .catch(() => setError("Match schedule could not be loaded."));
   }, []);
@@ -500,7 +502,7 @@ function PlayerPage() {
           ))}
         </section>
 
-        <KnockoutSection selectedPlayer={session.playerName} />
+        <KnockoutSection selectedPlayer={session.playerName} advancement={advancement} />
       </section>
     </main>
   );
@@ -519,6 +521,7 @@ type AdminState = {
   knockout: Record<string, string[]>;
   champion: string | null;
   leaderboard: { playerId: string; playerName?: string; name?: string; total: number; rank: number }[];
+  advancement: Record<string, { first?: string; second?: string }>;
 };
 
 const adminRounds = [
@@ -640,6 +643,44 @@ function AdminPage() {
             </section>
 
             <aside className="grid content-start gap-5">
+              <section className="grid gap-4 border border-ink/10 bg-white p-5 shadow-sm">
+                <h2 className="text-2xl font-black">Group advancement</h2>
+                <p className="text-sm text-ink/60">Set the 1st and 2nd place teams from each group. Players will only see these teams in their knockout picks.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {groupLetters.map((group) => (
+                    <div className="grid gap-2 rounded border border-ink/10 bg-paper p-3" key={group}>
+                      <span className="text-xs font-black uppercase text-red-700">Group {group}</span>
+                      <label className="grid gap-1">
+                        <span className="text-xs font-bold text-ink/60">1st place</span>
+                        <select
+                          className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
+                          value={state.advancement?.[group]?.first ?? ""}
+                          onChange={(event) => event.target.value && post("/api/admin/advancement", { group, position: 1, team: event.target.value })}
+                        >
+                          <option value="">— not set —</option>
+                          {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1">
+                        <span className="text-xs font-bold text-ink/60">2nd place</span>
+                        <select
+                          className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
+                          value={state.advancement?.[group]?.second ?? ""}
+                          onChange={(event) => event.target.value && post("/api/admin/advancement", { group, position: 2, team: event.target.value })}
+                        >
+                          <option value="">— not set —</option>
+                          {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               <section className="grid gap-4 border border-ink/10 bg-white p-5 shadow-sm">
                 <h2 className="text-2xl font-black">Knockout qualifiers</h2>
                 {adminRounds.map((round) => (
@@ -840,7 +881,7 @@ function GroupMatchRow({
   );
 }
 
-function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
+function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: string; advancement: Record<string, { first?: string; second?: string }> }) {
   const [picks, setPicks] = useState<KnockoutPicks>(() => {
     if (typeof window === "undefined") {
       return createEmptyKnockoutPicks();
@@ -848,6 +889,13 @@ function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
     return readKnockoutPicks(window.localStorage, selectedPlayer);
   });
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
+
+  const teamPool = useMemo(() => {
+    const advanced = Object.values(advancement).flatMap((entry) =>
+      [entry.first, entry.second].filter((t): t is string => Boolean(t))
+    );
+    return advanced.length > 0 ? advanced.sort() : allTeams;
+  }, [advancement]);
 
   useEffect(() => {
     writeKnockoutPicks(window.localStorage, selectedPlayer, picks);
@@ -902,7 +950,7 @@ function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
             onChange={(event) => setPicks({ ...picks, champion: event.target.value })}
           >
             <option value="">Choose champion</option>
-            {allTeams.map((teamName) => (
+            {teamPool.map((teamName) => (
               <option key={teamName} value={teamName}>
                 {teamName}
               </option>
@@ -946,7 +994,7 @@ function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
                         onChange={(event) => updateRoundPick(round.id, slotIndex, event.target.value)}
                       >
                         <option value="">Pick advancing team</option>
-                        {allTeams.map((optionTeamName) => (
+                        {teamPool.map((optionTeamName) => (
                           <option key={optionTeamName} value={optionTeamName}>
                             {optionTeamName}
                           </option>
@@ -970,7 +1018,7 @@ function KnockoutSection({ selectedPlayer }: { selectedPlayer: string }) {
 
       <footer className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-4 py-3 text-sm text-ink/65">
         <Trophy size={18} aria-hidden="true" />
-        <span>Round options use every seeded team until bracket slot metadata is added to the seed/API.</span>
+        <span>{Object.keys(advancement).length > 0 ? `Showing ${Object.values(advancement).flatMap(e => [e.first, e.second]).filter(Boolean).length} teams that advanced from the group stage.` : "Showing all teams — admin has not yet set group advancement."}</span>
       </footer>
     </>
   );

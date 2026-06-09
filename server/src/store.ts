@@ -51,6 +51,12 @@ export function createStore(options: StoreOptions) {
     );
     CREATE TABLE IF NOT EXISTS champion_actual (id INTEGER PRIMARY KEY CHECK (id = 1), team TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS scoring (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS group_advancement (
+      group_name TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      team TEXT NOT NULL,
+      PRIMARY KEY (group_name, position)
+    );
   `);
   try {
     db.exec("ALTER TABLE matches ADD COLUMN round TEXT NOT NULL DEFAULT 'group'");
@@ -173,6 +179,22 @@ export function createStore(options: StoreOptions) {
     },
     getActualChampion: () =>
       (db.prepare("SELECT team FROM champion_actual WHERE id = 1").get() as { team: string } | undefined)?.team,
+    saveGroupAdvancement: (group: string, position: 1 | 2, team: string) => {
+      db.prepare(
+        "INSERT INTO group_advancement (group_name, position, team) VALUES (?, ?, ?) ON CONFLICT(group_name, position) DO UPDATE SET team = excluded.team"
+      ).run(group.toUpperCase(), position, team);
+    },
+    getGroupAdvancement: () => {
+      const rows = db.prepare(
+        "SELECT group_name, position, team FROM group_advancement ORDER BY group_name, position"
+      ).all() as { group_name: string; position: number; team: string }[];
+      return rows.reduce<Record<string, { first?: string; second?: string }>>((acc, row) => {
+        if (!acc[row.group_name]) acc[row.group_name] = {};
+        if (row.position === 1) acc[row.group_name].first = row.team;
+        if (row.position === 2) acc[row.group_name].second = row.team;
+        return acc;
+      }, {});
+    },
     saveScoring: (scoring: Partial<Scoring>) => {
       const insert = db.prepare(
         "INSERT INTO scoring (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"

@@ -206,10 +206,10 @@ export function createApp(options: AppOptions = {}) {
     }
     const group = body.group?.toUpperCase();
     const position = body.position;
-    if (!group || (position !== 1 && position !== 2) || !body.team) {
+    if (!group || (position !== 1 && position !== 2 && position !== 3)) {
       return context.json({ error: "Invalid advancement payload" }, 400);
     }
-    store.saveGroupAdvancement(group, position as 1 | 2, body.team);
+    store.saveGroupAdvancement(group, position as 1 | 2 | 3, body.team ?? "");
     return context.json({ ok: true, advancement: store.getGroupAdvancement() });
   });
 

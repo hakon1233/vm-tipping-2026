@@ -179,7 +179,11 @@ export function createStore(options: StoreOptions) {
     },
     getActualChampion: () =>
       (db.prepare("SELECT team FROM champion_actual WHERE id = 1").get() as { team: string } | undefined)?.team,
-    saveGroupAdvancement: (group: string, position: 1 | 2, team: string) => {
+    saveGroupAdvancement: (group: string, position: 1 | 2 | 3, team: string) => {
+      if (!team) {
+        db.prepare("DELETE FROM group_advancement WHERE group_name = ? AND position = ?").run(group.toUpperCase(), position);
+        return;
+      }
       db.prepare(
         "INSERT INTO group_advancement (group_name, position, team) VALUES (?, ?, ?) ON CONFLICT(group_name, position) DO UPDATE SET team = excluded.team"
       ).run(group.toUpperCase(), position, team);
@@ -188,10 +192,11 @@ export function createStore(options: StoreOptions) {
       const rows = db.prepare(
         "SELECT group_name, position, team FROM group_advancement ORDER BY group_name, position"
       ).all() as { group_name: string; position: number; team: string }[];
-      return rows.reduce<Record<string, { first?: string; second?: string }>>((acc, row) => {
+      return rows.reduce<Record<string, { first?: string; second?: string; third?: string }>>((acc, row) => {
         if (!acc[row.group_name]) acc[row.group_name] = {};
         if (row.position === 1) acc[row.group_name].first = row.team;
         if (row.position === 2) acc[row.group_name].second = row.team;
+        if (row.position === 3) acc[row.group_name].third = row.team;
         return acc;
       }, {});
     },

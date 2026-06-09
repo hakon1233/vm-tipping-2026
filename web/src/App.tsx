@@ -650,13 +650,13 @@ function PlayerPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
-  const [advancement, setAdvancement] = useState<Record<string, { first?: string; second?: string }>>({});
+  const [advancement, setAdvancement] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
   const saveTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
       .then((response) => response.json())
-      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string }> }) => {
+      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }> }) => {
         setMatches(payload.matches);
         if (payload.players) setPlayers(payload.players);
         if (payload.advancement) setAdvancement(payload.advancement);
@@ -899,7 +899,7 @@ type AdminState = {
   knockout: Record<string, string[]>;
   champion: string | null;
   leaderboard: { playerId: string; playerName?: string; name?: string; total: number; rank: number }[];
-  advancement: Record<string, { first?: string; second?: string }>;
+  advancement: Record<string, { first?: string; second?: string; third?: string }>;
 };
 
 const adminRounds = [
@@ -1054,6 +1054,39 @@ function AdminPage() {
                           ))}
                         </select>
                       </label>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="grid gap-4 border border-ink/10 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black">Best 3rd-place qualifiers</h2>
+                    <p className="text-sm text-ink/60 mt-1">Select the 8 groups whose 3rd-place team advanced to R32. These join the 24 group-stage top-2 in players' knockout pick dropdowns.</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-black ${
+                    Object.values(state.advancement ?? {}).filter(a => a.third).length === 8
+                      ? "bg-green-100 text-green-700"
+                      : "bg-ink/10 text-ink/60"
+                  }`}>
+                    {Object.values(state.advancement ?? {}).filter(a => a.third).length}/8
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {groupLetters.map((group) => (
+                    <div className="grid gap-1 rounded border border-ink/10 bg-paper p-3" key={group}>
+                      <span className="text-xs font-black uppercase text-red-700">Group {group}</span>
+                      <select
+                        className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
+                        value={state.advancement?.[group]?.third ?? ""}
+                        onChange={(event) => post("/api/admin/advancement", { group, position: 3, team: event.target.value })}
+                      >
+                        <option value="">— did not advance —</option>
+                        {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
+                          <option key={team} value={team}>{team}</option>
+                        ))}
+                      </select>
                     </div>
                   ))}
                 </div>
@@ -1259,7 +1292,7 @@ function GroupMatchRow({
   );
 }
 
-function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: string; advancement: Record<string, { first?: string; second?: string }> }) {
+function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: string; advancement: Record<string, { first?: string; second?: string; third?: string }> }) {
   const [picks, setPicks] = useState<KnockoutPicks>(() => {
     if (typeof window === "undefined") {
       return createEmptyKnockoutPicks();
@@ -1270,7 +1303,7 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
 
   const teamPool = useMemo(() => {
     const advanced = Object.values(advancement).flatMap((entry) =>
-      [entry.first, entry.second].filter((t): t is string => Boolean(t))
+      [entry.first, entry.second, entry.third].filter((t): t is string => Boolean(t))
     );
     return advanced.length > 0 ? advanced.sort() : allTeams;
   }, [advancement]);
@@ -1396,7 +1429,7 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
 
       <footer className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-4 py-3 text-sm text-ink/65">
         <Trophy size={18} aria-hidden="true" />
-        <span>{Object.keys(advancement).length > 0 ? `Showing ${Object.values(advancement).flatMap(e => [e.first, e.second]).filter(Boolean).length} teams that advanced from the group stage.` : "Showing all teams — admin has not yet set group advancement."}</span>
+        <span>{Object.keys(advancement).length > 0 ? `Showing ${Object.values(advancement).flatMap(e => [e.first, e.second, e.third]).filter(Boolean).length} teams that advanced from the group stage.` : "Showing all teams — admin has not yet set group advancement."}</span>
       </footer>
     </>
   );

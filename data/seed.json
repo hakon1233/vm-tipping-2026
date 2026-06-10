@@ -1,6 +1,8 @@
 {
   "tournament": "World Cup 2026",
   "title": "VM-tipping 2026 — Friends Prediction League",
+  "groupStageDeadline": "2026-06-11T19:00:00.000Z",
+  "knockoutDeadline": "2026-06-11T19:00:00.000Z",
   "players": [
     "Player 1",
     "Player 2",

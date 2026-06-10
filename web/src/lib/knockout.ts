@@ -98,3 +98,18 @@ export function readKnockoutPicks(storage: KnockoutStorage, playerName: string):
 export function writeKnockoutPicks(storage: KnockoutStorage, playerName: string, picks: KnockoutPicks): void {
   storage.setItem(knockoutStorageKey(playerName), JSON.stringify(picks));
 }
+
+// VMT-20: when a player renames themselves, migrate their localStorage key
+export function renameKnockoutPicks(
+  storage: KnockoutStorage & { removeItem: (key: string) => void },
+  oldName: string,
+  newName: string
+): void {
+  if (oldName === newName) return;
+  const oldKey = knockoutStorageKey(oldName);
+  const raw = storage.getItem(oldKey);
+  if (raw) {
+    storage.setItem(knockoutStorageKey(newName), raw);
+    storage.removeItem(oldKey);
+  }
+}

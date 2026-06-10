@@ -57,6 +57,11 @@ export function createStore(options: StoreOptions) {
       team TEXT NOT NULL,
       PRIMARY KEY (group_name, position)
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      player_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
+    );
   `);
   try {
     db.exec("ALTER TABLE matches ADD COLUMN round TEXT NOT NULL DEFAULT 'group'");
@@ -65,6 +70,9 @@ export function createStore(options: StoreOptions) {
   }
 
   seedDatabase();
+
+  // Migrate all group match kickoff times to the real deadline so picks lock correctly.
+  db.prepare("UPDATE matches SET kickoff_at = ? WHERE round = 'group'").run(seed.groupStageDeadline);
 
   function seedDatabase() {
     const playerInsert = db.prepare("INSERT OR IGNORE INTO players (id, name) VALUES (?, ?)");
@@ -184,6 +192,23 @@ export function createStore(options: StoreOptions) {
         db.prepare("DELETE FROM group_advancement WHERE group_name = ? AND position = ?").run(group.toUpperCase(), position);
         return;
       }
+      // VMT-17: reject if the same team is already in another position in this group
+      const conflict = db.prepare(
+        "SELECT position FROM group_advancement WHERE group_name = ? AND team = ? AND position != ?"
+      ).get(group.toUpperCase(), team, position) as { position: number } | undefined;
+      if (conflict) {
+        throw new Error(`${team} is already set as position ${conflict.position} in group ${group.toUpperCase()}`);
+      }
+      // VMT-18: cap third-place qualifiers at 8
+      if (position === 3) {
+        const existing = db.prepare(
+          "SELECT team FROM group_advancement WHERE group_name = ? AND position = 3"
+        ).get(group.toUpperCase()) as { team: string } | undefined;
+        if (!existing) {
+          const count = (db.prepare("SELECT COUNT(*) as c FROM group_advancement WHERE position = 3").get() as { c: number }).c;
+          if (count >= 8) throw new Error("Maximum 8 third-place qualifiers already set");
+        }
+      }
       db.prepare(
         "INSERT INTO group_advancement (group_name, position, team) VALUES (?, ?, ?) ON CONFLICT(group_name, position) DO UPDATE SET team = excluded.team"
       ).run(group.toUpperCase(), position, team);
@@ -209,6 +234,19 @@ export function createStore(options: StoreOptions) {
       });
     },
     getScoring,
+    // VMT-21: SQLite-backed sessions so logins survive server restarts
+    createSession: (token: string, playerId: string) => {
+      db.prepare("INSERT OR REPLACE INTO sessions (token, player_id) VALUES (?, ?)").run(token, playerId);
+    },
+    getSession: (token: string): string | undefined => {
+      const row = db.prepare("SELECT player_id FROM sessions WHERE token = ?").get(token) as
+        | { player_id: string }
+        | undefined;
+      return row?.player_id;
+    },
+    deleteSession: (token: string) => {
+      db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    },
     getLeaderboard: () => {
       const scoring = getScoring();
       const players = db.prepare("SELECT id, name FROM players ORDER BY id").all() as Player[];

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
+import seed from "../../data/seed.json" with { type: "json" };
 import { createStore, type AppStore, type KnockoutRound, type Scoring } from "./store.js";
 
 type AppOptions = {
@@ -29,7 +30,6 @@ export function createApp(options: AppOptions = {}) {
   const adminPin = options.adminPin ?? process.env.ADMIN_PIN ?? "admin";
   const leaguePin = options.leaguePin ?? process.env.LEAGUE_PIN ?? "league";
   const now = options.now ?? (() => new Date());
-  const sessions = new Map<string, string>();
   const app = new Hono();
 
   app.use("/api/*", cors());
@@ -86,12 +86,12 @@ export function createApp(options: AppOptions = {}) {
     if (!player) return context.json({ error: "Unknown player" }, 404);
 
     const token = `session-${player.id}-${Math.random().toString(36).slice(2)}`;
-    sessions.set(token, player.id);
+    store.createSession(token, player.id);
     return context.json({ player, session: { token, playerId: player.id } });
   });
 
   app.post("/api/picks", async (context) => {
-    const playerId = authenticate(context.req.header("authorization"), sessions);
+    const playerId = authenticate(context.req.header("authorization"), store);
     if (!playerId) return context.json({ error: "Unauthorized" }, 401);
 
     const body = await context.req.json<{
@@ -115,6 +115,11 @@ export function createApp(options: AppOptions = {}) {
       return context.json({ ok: true });
     }
 
+    // VMT-15: lock knockout picks after knockoutDeadline
+    if (now().getTime() >= Date.parse(seed.knockoutDeadline)) {
+      return context.json({ error: "Knockout picks are locked" }, 409);
+    }
+
     if (body.round === "champion" && body.teamName) {
       store.saveKnockoutPick({ playerId, round: "champion", teams: [body.teamName] });
       return context.json({ ok: true });
@@ -129,7 +134,7 @@ export function createApp(options: AppOptions = {}) {
   });
 
   app.patch("/api/player/name", async (context) => {
-    const playerId = authenticate(context.req.header("authorization"), sessions);
+    const playerId = authenticate(context.req.header("authorization"), store);
     if (!playerId) return context.json({ error: "Unauthorized" }, 401);
 
     const body = await context.req.json<{ name?: string }>();
@@ -148,14 +153,22 @@ export function createApp(options: AppOptions = {}) {
   });
 
   app.get("/api/picks/:playerId", (context) => {
-    const playerId = context.req.param("playerId");
-    const player = store.getPlayerById(playerId);
+    const requestedPlayerId = context.req.param("playerId");
+    const player = store.getPlayerById(requestedPlayerId);
     if (!player) return context.json({ error: "Unknown player" }, 404);
+
+    // VMT-16: before the group-stage deadline, only the player themselves can view their picks
+    if (now().getTime() < Date.parse(seed.groupStageDeadline)) {
+      const sessionPlayerId = authenticate(context.req.header("authorization"), store);
+      if (sessionPlayerId !== requestedPlayerId) {
+        return context.json({ error: "Picks are private until the group stage deadline" }, 403);
+      }
+    }
 
     return context.json({
       player,
-      group: store.getGroupPicks(playerId),
-      knockout: store.getKnockoutPicks(playerId)
+      group: store.getGroupPicks(requestedPlayerId),
+      knockout: store.getKnockoutPicks(requestedPlayerId)
     });
   });
 
@@ -209,7 +222,11 @@ export function createApp(options: AppOptions = {}) {
     if (!group || (position !== 1 && position !== 2 && position !== 3)) {
       return context.json({ error: "Invalid advancement payload" }, 400);
     }
-    store.saveGroupAdvancement(group, position as 1 | 2 | 3, body.team ?? "");
+    try {
+      store.saveGroupAdvancement(group, position as 1 | 2 | 3, body.team ?? "");
+    } catch (err) {
+      return context.json({ error: (err as Error).message }, 409);
+    }
     return context.json({ ok: true, advancement: store.getGroupAdvancement() });
   });
 
@@ -239,9 +256,9 @@ export function createApp(options: AppOptions = {}) {
 
 export const app = createApp({ store: createStore({ databasePath: ":memory:" }) });
 
-function authenticate(authorization: string | undefined, sessions: Map<string, string>) {
+function authenticate(authorization: string | undefined, store: AppStore) {
   const token = authorization?.match(/^Bearer (.+)$/)?.[1];
-  return token ? sessions.get(token) : undefined;
+  return token ? store.getSession(token) : undefined;
 }
 
 function isAdmin(headerPin: string | undefined, bodyPin: string | undefined, expectedPin: string) {

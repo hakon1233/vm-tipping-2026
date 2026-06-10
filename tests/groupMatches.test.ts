@@ -29,11 +29,13 @@ describe("buildGroupMatches", () => {
     ]);
   });
 
-  it("assigns kickoff times so lock state can be derived per match", () => {
+  it("assigns a valid kickoff time to every match so lock state can be derived", () => {
     const matches = buildGroupMatches();
     const kickoffTimes = matches.map((match) => Date.parse(match.kickoffAt));
 
     expect(kickoffTimes.every(Number.isFinite)).toBe(true);
-    expect(kickoffTimes[1]).toBeGreaterThan(kickoffTimes[0]);
+    // All group matches share a single deadline so picks lock simultaneously.
+    const unique = new Set(kickoffTimes);
+    expect(unique.size).toBe(1);
   });
 });

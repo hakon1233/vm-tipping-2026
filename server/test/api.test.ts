@@ -20,7 +20,7 @@ function testApp(now = new Date("2026-01-01T12:00:00.000Z")) {
   };
 }
 
-async function login(app: ReturnType<typeof createApp>, name = "Bendik") {
+async function login(app: ReturnType<typeof createApp>, name = "Player 1") {
   const response = await app.request("/api/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -66,8 +66,8 @@ describe("VM tipping API", () => {
   it("validates player login with the shared league PIN", async () => {
     const { app } = testApp();
 
-    const ok = await login(app, "Nils Erland");
-    expect(ok.player.name).toBe("Nils Erland");
+    const ok = await login(app, "Player 2");
+    expect(ok.player.name).toBe("Player 2");
     expect(ok.session.token).toBeTruthy();
 
     const bad = await app.request("/api/login", {
@@ -102,10 +102,12 @@ describe("VM tipping API", () => {
     });
     expect(knockoutPick.status).toBe(200);
 
-    const picks = await app.request(`/api/picks/${player.id}`);
+    const picks = await app.request(`/api/picks/${player.id}`, {
+      headers: { authorization: `Bearer ${session.token}` }
+    });
     expect(picks.status).toBe(200);
     await expect(picks.json()).resolves.toMatchObject({
-      player: { id: player.id, name: "Bendik" },
+      player: { id: player.id, name: "Player 1" },
       group: { "A-1": "1" },
       knockout: { r32: ["Mexico", "South Africa"] },
     });
@@ -182,7 +184,7 @@ describe("VM tipping API", () => {
     expect(leaderboard.status).toBe(200);
     const body = await leaderboard.json();
     expect(body.leaderboard[0]).toMatchObject({
-      playerName: "Bendik",
+      playerName: "Player 1",
       groupPoints: 1,
       r32Points: 4,
       championPoints: 7,

@@ -9,6 +9,7 @@ import {
   duplicateTeamNamesByRound,
   knockoutRounds,
   readKnockoutPicks,
+  renameKnockoutPicks,
   writeKnockoutPicks
 } from "./lib/knockout";
 
@@ -667,7 +668,9 @@ function PlayerPage() {
   useEffect(() => {
     if (!session) return;
 
-    fetch(`${apiBaseUrl}/api/picks/${session.playerId}`)
+    fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
+      headers: { authorization: `Bearer ${session.token}` }
+    })
       .then((response) => response.json())
       .then((payload: { group: Record<string, GroupPickOutcome> }) => setGroupPicks(payload.group))
       .catch(() => setError("Saved picks could not be restored."));
@@ -738,6 +741,8 @@ function PlayerPage() {
       return;
     }
 
+    // VMT-20: migrate localStorage KO key to new name before updating session
+    renameKnockoutPicks(window.localStorage, session.playerName, name);
     const updated = { ...session, playerName: name };
     localStorage.setItem(sessionKey, JSON.stringify(updated));
     setSession(updated);
@@ -880,7 +885,7 @@ function PlayerPage() {
           ))}
         </section>
 
-        <KnockoutSection selectedPlayer={session.playerName} advancement={advancement} />
+        <KnockoutSection session={session} advancement={advancement} />
       </section>
     </main>
   );
@@ -1292,14 +1297,15 @@ function GroupMatchRow({
   );
 }
 
-function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: string; advancement: Record<string, { first?: string; second?: string; third?: string }> }) {
+function KnockoutSection({ session, advancement }: { session: Session; advancement: Record<string, { first?: string; second?: string; third?: string }> }) {
+  const locked = Date.now() >= Date.parse(seed.knockoutDeadline);
   const [picks, setPicks] = useState<KnockoutPicks>(() => {
-    if (typeof window === "undefined") {
-      return createEmptyKnockoutPicks();
-    }
-    return readKnockoutPicks(window.localStorage, selectedPlayer);
+    if (typeof window === "undefined") return createEmptyKnockoutPicks();
+    return readKnockoutPicks(window.localStorage, session.playerName);
   });
+  const [koSaveState, setKoSaveState] = useState<SaveState>("idle");
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
+  const saveTimer = useRef<number | undefined>(undefined);
 
   const teamPool = useMemo(() => {
     const advanced = Object.values(advancement).flatMap((entry) =>
@@ -1308,19 +1314,96 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
     return advanced.length > 0 ? advanced.sort() : allTeams;
   }, [advancement]);
 
+  // VMT-12: load knockout picks from server (server is authoritative)
   useEffect(() => {
-    writeKnockoutPicks(window.localStorage, selectedPlayer, picks);
-  }, [picks, selectedPlayer]);
+    fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
+      headers: { authorization: `Bearer ${session.token}` }
+    })
+      .then((r) => r.json())
+      .then((payload: { knockout?: Record<string, string[]> }) => {
+        if (!payload.knockout) return;
+        const serverPicks: KnockoutPicks = {
+          champion: payload.knockout.champion?.[0] ?? "",
+          rounds: knockoutRounds.reduce(
+            (acc, r) => ({
+              ...acc,
+              [r.id]: Array.from({ length: r.slotCount }, (_, i) => payload.knockout![r.id]?.[i] ?? "")
+            }),
+            {} as Record<KnockoutRoundId, string[]>
+          )
+        };
+        setPicks(serverPicks);
+        writeKnockoutPicks(window.localStorage, session.playerName, serverPicks);
+      })
+      .catch(() => {}); // keep localStorage picks if server unavailable
+  }, [session.playerId]);
 
-  const updateRoundPick = (roundId: KnockoutRoundId, slotIndex: number, teamName: string) => {
-    setPicks((current) => ({
-      ...current,
-      rounds: {
-        ...current.rounds,
-        [roundId]: current.rounds[roundId].map((pick, index) => (index === slotIndex ? teamName : pick))
+  // Persist to localStorage on every change
+  useEffect(() => {
+    writeKnockoutPicks(window.localStorage, session.playerName, picks);
+  }, [picks, session.playerName]);
+
+  function scheduleSave(updatedPicks: KnockoutPicks) {
+    if (locked) return;
+    window.clearTimeout(saveTimer.current);
+    setKoSaveState("saving");
+    saveTimer.current = window.setTimeout(() => void saveToServer(updatedPicks), 500);
+  }
+
+  async function saveToServer(updatedPicks: KnockoutPicks) {
+    try {
+      const headers = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
+      const requests: Promise<Response>[] = knockoutRounds.map((r) =>
+        fetch(`${apiBaseUrl}/api/picks`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) })
+        })
+      );
+      if (updatedPicks.champion) {
+        requests.push(
+          fetch(`${apiBaseUrl}/api/picks`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ round: "champion", teamName: updatedPicks.champion })
+          })
+        );
       }
-    }));
-  };
+      const responses = await Promise.all(requests);
+      if (responses.every((r) => r.ok)) {
+        setKoSaveState("saved");
+        window.setTimeout(() => setKoSaveState("idle"), 1200);
+      } else {
+        setKoSaveState("error");
+      }
+    } catch {
+      setKoSaveState("error");
+    }
+  }
+
+  function updateRoundPick(roundId: KnockoutRoundId, slotIndex: number, teamName: string) {
+    if (locked) return;
+    setPicks((current) => {
+      const next = {
+        ...current,
+        rounds: {
+          ...current.rounds,
+          [roundId]: current.rounds[roundId].map((pick, index) => (index === slotIndex ? teamName : pick))
+        }
+      };
+      scheduleSave(next);
+      return next;
+    });
+  }
+
+  function updateChampion(teamName: string) {
+    if (locked) return;
+    setPicks((current) => {
+      const next = { ...current, champion: teamName };
+      scheduleSave(next);
+      return next;
+    });
+  }
 
   const completedSlots = knockoutRounds.reduce(
     (total, round) => total + picks.rounds[round.id].filter(Boolean).length,
@@ -1336,13 +1419,21 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
           <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Knockout picks</h1>
         </div>
         <div className="grid min-w-48 gap-2 rounded-md border border-ink/10 bg-paper p-4 text-sm text-ink/70">
-          <div className="flex items-center gap-2 font-semibold text-pitch">
-            <Save size={18} aria-hidden="true" />
-            <span>Autosaved for {selectedPlayer}</span>
-          </div>
+          {locked ? (
+            <div className="flex items-center gap-2 font-semibold text-red-700">
+              <LockKeyhole size={18} aria-hidden="true" />
+              <span>Picks locked</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 font-semibold text-pitch">
+              <Save size={18} aria-hidden="true" />
+              <span>Saving for {session.playerName}</span>
+            </div>
+          )}
           <strong className="text-2xl text-ink">
             {completedSlots}/{totalSlots}
           </strong>
+          {!locked && <SaveIndicator state={koSaveState} />}
         </div>
       </header>
 
@@ -1356,9 +1447,10 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
         <label className="grid gap-2">
           <span className="text-sm font-bold text-ink/70">Champion</span>
           <select
-            className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base"
+            className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
+            disabled={locked}
             value={picks.champion}
-            onChange={(event) => setPicks({ ...picks, champion: event.target.value })}
+            onChange={(event) => updateChampion(event.target.value)}
           >
             <option value="">Choose champion</option>
             {teamPool.map((teamName) => (
@@ -1400,7 +1492,8 @@ function KnockoutSection({ selectedPlayer, advancement }: { selectedPlayer: stri
                       </span>
                       <select
                         aria-label={`${round.label} match ${slotIndex + 1}`}
-                        className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base"
+                        className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
+                        disabled={locked}
                         value={teamName}
                         onChange={(event) => updateRoundPick(round.id, slotIndex, event.target.value)}
                       >

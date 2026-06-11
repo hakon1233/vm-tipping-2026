@@ -1421,13 +1421,15 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
   async function saveToServer(updatedPicks: KnockoutPicks) {
     try {
       const headers = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
-      const requests: Promise<Response>[] = knockoutRounds.map((r) =>
-        fetch(`${apiBaseUrl}/api/picks`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) })
-        })
-      );
+      const requests: Promise<Response>[] = knockoutRounds
+        .filter((r) => updatedPicks.rounds[r.id].some(Boolean))
+        .map((r) =>
+          fetch(`${apiBaseUrl}/api/picks`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) })
+          })
+        );
       if (updatedPicks.champion) {
         requests.push(
           fetch(`${apiBaseUrl}/api/picks`, {

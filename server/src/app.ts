@@ -132,6 +132,24 @@ export function createApp(options: AppOptions = {}) {
     }
 
     if (body.groupAdvancement && typeof body.groupAdvancement === "object") {
+      // VMT-27: a group's 1st and 2nd picks must be distinct teams from that group.
+      // Without this guard the same team resolves into two R32 slots (e.g. 1J and 2J)
+      // and the rendered bracket shows one team in multiple matchups.
+      const teamGroups = new Map(store.listTeams().map((team) => [team.name, team.group.toUpperCase()]));
+      const stored = store.getPlayerGroupAdvancement(playerId);
+      for (const [group, picks] of Object.entries(body.groupAdvancement)) {
+        const groupKey = group.toUpperCase();
+        for (const team of [picks.first, picks.second]) {
+          if (team && teamGroups.get(team) !== groupKey) {
+            return context.json({ error: `Team "${team}" is not in group ${groupKey}` }, 400);
+          }
+        }
+        const first = picks.first !== undefined ? picks.first : stored[groupKey]?.first;
+        const second = picks.second !== undefined ? picks.second : stored[groupKey]?.second;
+        if (first && second && first === second) {
+          return context.json({ error: `Group ${groupKey}: 1st and 2nd picks must be different teams` }, 400);
+        }
+      }
       for (const [group, picks] of Object.entries(body.groupAdvancement)) {
         if (picks.first !== undefined) {
           store.savePlayerGroupAdvancement({ playerId, group, position: 1, team: picks.first ?? "" });

@@ -1479,12 +1479,15 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
   function updateGroupAdvPick(group: string, position: 1 | 2, team: string) {
     if (locked) return;
     setPlayerAdv((current) => {
+      // VMT-27: 1st and 2nd must be distinct — if the new pick collides with the
+      // other position, clear that position so the same team can't occupy two R32 slots.
+      const other = position === 1 ? (current[group]?.second ?? "") : (current[group]?.first ?? "");
+      const collides = Boolean(team) && team === other;
       const next = {
         ...current,
         [group]: {
-          first: current[group]?.first ?? "",
-          second: current[group]?.second ?? "",
-          [position === 1 ? "first" : "second"]: team
+          first: position === 1 ? team : collides ? "" : (current[group]?.first ?? ""),
+          second: position === 2 ? team : collides ? "" : (current[group]?.second ?? "")
         }
       };
       scheduleAdvSave(next);

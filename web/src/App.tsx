@@ -671,8 +671,19 @@ function PlayerPage() {
     fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
       headers: { authorization: `Bearer ${session.token}` }
     })
-      .then((response) => response.json())
-      .then((payload: { group: Record<string, GroupPickOutcome> }) => setGroupPicks(payload.group))
+      .then((response) => {
+        if (response.status === 401 || response.status === 403) {
+          // Session is invalid or expired — clear it so the user is shown login
+          localStorage.removeItem(sessionKey);
+          setSession(null);
+          return null;
+        }
+        if (!response.ok) throw new Error("picks fetch failed");
+        return response.json();
+      })
+      .then((payload: { group: Record<string, GroupPickOutcome> } | null) => {
+        if (payload?.group) setGroupPicks(payload.group);
+      })
       .catch(() => setError("Saved picks could not be restored."));
   }, [session]);
 

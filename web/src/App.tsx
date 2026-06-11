@@ -81,18 +81,12 @@ export function App() {
 
   const hasSession = Boolean(readSession());
 
-  // Leaderboard and overview require a valid session — redirect to login if not logged in
-  if (!hasSession && (route === "/leaderboard" || route === "/overview")) {
-    window.location.hash = "#/";
-    return null;
-  }
-
   const page =
     route === "/admin"
       ? <AdminPage />
-      : route === "/leaderboard"
+      : route === "/leaderboard" && hasSession
       ? <LeaderboardPage />
-      : route === "/overview"
+      : route === "/overview" && hasSession
       ? <OverviewPage />
       : <PlayerPage />;
   return (

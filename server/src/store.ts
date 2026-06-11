@@ -199,13 +199,13 @@ export function createStore(options: StoreOptions) {
         db.prepare("DELETE FROM group_advancement WHERE group_name = ? AND position = ?").run(group.toUpperCase(), position);
         return;
       }
-      // VMT-17: reject if the same team is already in another position in this group
-      const conflict = db.prepare(
-        "SELECT position FROM group_advancement WHERE group_name = ? AND team = ? AND position != ?"
-      ).get(group.toUpperCase(), team, position) as { position: number } | undefined;
-      if (conflict) {
-        throw new Error(`${team} is already set as position ${conflict.position} in group ${group.toUpperCase()}`);
-      }
+      // VMT-17: a team can only hold one position per group. VMT-29: instead of
+      // rejecting the write (which made it impossible for the admin to swap
+      // 1st/2nd when entering real results), clear the conflicting position so
+      // the edit always lands and the invariant still holds.
+      db.prepare(
+        "DELETE FROM group_advancement WHERE group_name = ? AND team = ? AND position != ?"
+      ).run(group.toUpperCase(), team, position);
       // VMT-18: cap third-place qualifiers at 8
       if (position === 3) {
         const existing = db.prepare(

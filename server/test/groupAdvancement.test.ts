@@ -108,3 +108,69 @@ describe("player group advancement validation (VMT-27)", () => {
     expect((await postAdvancement(app, session.token, { J: { second: "" } })).status).toBe(200);
   });
 });
+
+// VMT-29: the admin must always be able to edit actual advancement, including
+// swapping 1st/2nd. The VMT-17 guard used to reject any write where the team
+// already held another position, which made swaps impossible from the admin UI
+// ("Save failed" with no path forward). Now the conflicting position is cleared
+// so the write lands and the one-position-per-team invariant still holds.
+describe("admin group advancement editing (VMT-29)", () => {
+  async function postAdminAdvancement(
+    app: ReturnType<typeof createApp>,
+    body: { group: string; position: number; team: string }
+  ) {
+    return app.request("/api/admin/advancement", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ adminPin: "admin-pin", ...body })
+    });
+  }
+
+  async function getAdvancement(app: ReturnType<typeof createApp>) {
+    const response = await app.request("/api/admin/state");
+    const state = (await response.json()) as {
+      advancement: Record<string, { first?: string; second?: string; third?: string }>;
+    };
+    return state.advancement;
+  }
+
+  it("moving the current 2nd-place team to 1st clears the 2nd slot instead of rejecting", async () => {
+    const { app } = testApp();
+
+    expect((await postAdminAdvancement(app, { group: "J", position: 1, team: "Argentina" })).status).toBe(200);
+    expect((await postAdminAdvancement(app, { group: "J", position: 2, team: "Algeria" })).status).toBe(200);
+
+    // Real result: Algeria actually won the group. This used to 409.
+    const response = await postAdminAdvancement(app, { group: "J", position: 1, team: "Algeria" });
+    expect(response.status).toBe(200);
+
+    const advancement = await getAdvancement(app);
+    expect(advancement.J.first).toBe("Algeria");
+    expect(advancement.J.second).toBeUndefined();
+  });
+
+  it("a full 1st/2nd swap is possible in two edits", async () => {
+    const { app } = testApp();
+
+    await postAdminAdvancement(app, { group: "J", position: 1, team: "Argentina" });
+    await postAdminAdvancement(app, { group: "J", position: 2, team: "Algeria" });
+
+    expect((await postAdminAdvancement(app, { group: "J", position: 1, team: "Algeria" })).status).toBe(200);
+    expect((await postAdminAdvancement(app, { group: "J", position: 2, team: "Argentina" })).status).toBe(200);
+
+    const advancement = await getAdvancement(app);
+    expect(advancement.J.first).toBe("Algeria");
+    expect(advancement.J.second).toBe("Argentina");
+  });
+
+  it("still never stores the same team in two positions of one group", async () => {
+    const { app } = testApp();
+
+    await postAdminAdvancement(app, { group: "J", position: 1, team: "Argentina" });
+    await postAdminAdvancement(app, { group: "J", position: 3, team: "Argentina" });
+
+    const advancement = await getAdvancement(app);
+    expect(advancement.J.third).toBe("Argentina");
+    expect(advancement.J.first).toBeUndefined();
+  });
+});

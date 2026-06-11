@@ -27,8 +27,28 @@
     "K": ["Portugal", "DR Congo", "Uzbekistan", "Colombia"],
     "L": ["England", "Croatia", "Ghana", "Panama"]
   },
+  "r32Bracket": [
+    { "id": "m73", "slot1": "2A", "slot2": "2B" },
+    { "id": "m74", "slot1": "1E", "slot2": "3rd", "slot2Groups": ["A","B","C","D","F"] },
+    { "id": "m75", "slot1": "1F", "slot2": "2C" },
+    { "id": "m76", "slot1": "1C", "slot2": "2F" },
+    { "id": "m77", "slot1": "1I", "slot2": "3rd", "slot2Groups": ["C","D","F","G","H"] },
+    { "id": "m78", "slot1": "2E", "slot2": "2I" },
+    { "id": "m79", "slot1": "1A", "slot2": "3rd", "slot2Groups": ["C","E","F","H","I"] },
+    { "id": "m80", "slot1": "1L", "slot2": "3rd", "slot2Groups": ["E","H","I","J","K"] },
+    { "id": "m81", "slot1": "1D", "slot2": "3rd", "slot2Groups": ["B","E","F","I","J"] },
+    { "id": "m82", "slot1": "1G", "slot2": "3rd", "slot2Groups": ["A","E","H","I","J"] },
+    { "id": "m83", "slot1": "2K", "slot2": "2L" },
+    { "id": "m84", "slot1": "1H", "slot2": "2J" },
+    { "id": "m85", "slot1": "1B", "slot2": "3rd", "slot2Groups": ["E","F","G","I","J"] },
+    { "id": "m86", "slot1": "1J", "slot2": "2H" },
+    { "id": "m87", "slot1": "1K", "slot2": "3rd", "slot2Groups": ["D","E","I","J","L"] },
+    { "id": "m88", "slot1": "2D", "slot2": "2G" }
+  ],
   "scoring": {
     "groupGame": 1,
+    "groupFirst": 3,
+    "groupSecond": 2,
     "r32Team": 2,
     "r16Team": 3,
     "qfTeam": 4,

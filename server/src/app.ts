@@ -100,6 +100,7 @@ export function createApp(options: AppOptions = {}) {
       round?: KnockoutRound | "champion";
       teamNames?: string[];
       teamName?: string;
+      groupAdvancement?: Record<string, { first?: string; second?: string }>;
     }>();
 
     if (body.matchId) {
@@ -127,6 +128,18 @@ export function createApp(options: AppOptions = {}) {
 
     if (body.round && validRounds.has(body.round) && Array.isArray(body.teamNames)) {
       store.saveKnockoutPick({ playerId, round: body.round, teams: body.teamNames });
+      return context.json({ ok: true });
+    }
+
+    if (body.groupAdvancement && typeof body.groupAdvancement === "object") {
+      for (const [group, picks] of Object.entries(body.groupAdvancement)) {
+        if (picks.first !== undefined) {
+          store.savePlayerGroupAdvancement({ playerId, group, position: 1, team: picks.first ?? "" });
+        }
+        if (picks.second !== undefined) {
+          store.savePlayerGroupAdvancement({ playerId, group, position: 2, team: picks.second ?? "" });
+        }
+      }
       return context.json({ ok: true });
     }
 
@@ -168,7 +181,8 @@ export function createApp(options: AppOptions = {}) {
     return context.json({
       player,
       group: store.getGroupPicks(requestedPlayerId),
-      knockout: store.getKnockoutPicks(requestedPlayerId)
+      knockout: store.getKnockoutPicks(requestedPlayerId),
+      groupAdvancement: store.getPlayerGroupAdvancement(requestedPlayerId)
     });
   });
 

@@ -46,6 +46,8 @@ export type GroupPick = {
 
 export type ScoringConfig = {
   groupGame: number;
+  groupFirst: number;
+  groupSecond: number;
   r32Team: number;
   r16Team: number;
   qfTeam: number;

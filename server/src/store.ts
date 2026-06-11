@@ -62,6 +62,13 @@ export function createStore(options: StoreOptions) {
       player_id TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
     );
+    CREATE TABLE IF NOT EXISTS player_group_advancement (
+      player_id TEXT NOT NULL,
+      group_name TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      team TEXT NOT NULL,
+      PRIMARY KEY (player_id, group_name, position)
+    );
   `);
   try {
     db.exec("ALTER TABLE matches ADD COLUMN round TEXT NOT NULL DEFAULT 'group'");
@@ -247,6 +254,26 @@ export function createStore(options: StoreOptions) {
     deleteSession: (token: string) => {
       db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
     },
+    savePlayerGroupAdvancement: ({ playerId, group, position, team }: { playerId: string; group: string; position: 1 | 2; team: string }) => {
+      if (!team) {
+        db.prepare("DELETE FROM player_group_advancement WHERE player_id = ? AND group_name = ? AND position = ?").run(playerId, group.toUpperCase(), position);
+        return;
+      }
+      db.prepare(
+        "INSERT INTO player_group_advancement (player_id, group_name, position, team) VALUES (?, ?, ?, ?) ON CONFLICT(player_id, group_name, position) DO UPDATE SET team = excluded.team"
+      ).run(playerId, group.toUpperCase(), position, team);
+    },
+    getPlayerGroupAdvancement: (playerId: string): Record<string, { first?: string; second?: string }> => {
+      const rows = db.prepare(
+        "SELECT group_name, position, team FROM player_group_advancement WHERE player_id = ? ORDER BY group_name, position"
+      ).all(playerId) as { group_name: string; position: number; team: string }[];
+      return rows.reduce<Record<string, { first?: string; second?: string }>>((acc, row) => {
+        if (!acc[row.group_name]) acc[row.group_name] = {};
+        if (row.position === 1) acc[row.group_name].first = row.team;
+        if (row.position === 2) acc[row.group_name].second = row.team;
+        return acc;
+      }, {});
+    },
     getLeaderboard: () => {
       const scoring = getScoring();
       const players = db.prepare("SELECT id, name FROM players ORDER BY id").all() as Player[];
@@ -260,16 +287,18 @@ export function createStore(options: StoreOptions) {
           )
           .get(player.id) as { total: number };
         const groupPoints = correct.total * scoring.groupGame;
+        const groupAdvPoints = scoreGroupAdvancement(player.id, scoring);
         const knockout = scoreKnockout(player.id, scoring);
         return {
           playerId: player.id,
           playerName: player.name,
           name: player.name,
-          groupPoints,
+          groupPoints: groupPoints + groupAdvPoints,
           ...knockout,
           knockoutPoints: knockout.r32Points + knockout.r16Points + knockout.qfPoints + knockout.sfPoints + knockout.finalPoints + knockout.championPoints,
           total:
             groupPoints +
+            groupAdvPoints +
             knockout.r32Points +
             knockout.r16Points +
             knockout.qfPoints +
@@ -290,6 +319,19 @@ export function createStore(options: StoreOptions) {
       return rows;
     }
   };
+
+  function scoreGroupAdvancement(playerId: string, scoring: Scoring): number {
+    const picks = store.getPlayerGroupAdvancement(playerId);
+    const actual = store.getGroupAdvancement();
+    let points = 0;
+    for (const [group, groupPicks] of Object.entries(picks)) {
+      const actualGroup = actual[group];
+      if (!actualGroup) continue;
+      if (groupPicks.first && groupPicks.first === actualGroup.first) points += scoring.groupFirst ?? 0;
+      if (groupPicks.second && groupPicks.second === actualGroup.second) points += scoring.groupSecond ?? 0;
+    }
+    return points;
+  }
 
   function scoreKnockout(playerId: string, scoring: Scoring) {
     const pointMap = {

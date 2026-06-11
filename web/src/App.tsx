@@ -943,10 +943,22 @@ function AdminPage() {
   const [state, setState] = useState<AdminState | null>(null);
   const [status, setStatus] = useState("Locked");
 
+  // VMT-29: the tunnel URL can rotate while a tab stays open, leaving the
+  // in-memory apiBaseUrl pointing at a dead host. On network failure, re-fetch
+  // config.json once to pick up the new URL and retry.
+  async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
+    try {
+      return await fetch(`${apiBaseUrl}${path}`, init);
+    } catch {
+      await loadConfig();
+      return fetch(`${apiBaseUrl}${path}`, init);
+    }
+  }
+
   async function loadState() {
     let response: Response;
     try {
-      response = await fetch(`${apiBaseUrl}/api/admin/state`);
+      response = await adminFetch("/api/admin/state");
     } catch {
       setStatus("Error: could not reach server");
       return;
@@ -969,13 +981,25 @@ function AdminPage() {
   async function post(path: string, body: object) {
     if (!adminPin) return;
     setStatus("Saving");
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ adminPin, ...body })
-    });
+    let response: Response;
+    try {
+      response = await adminFetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ adminPin, ...body })
+      });
+    } catch {
+      setStatus("Save failed: could not reach server");
+      return;
+    }
     if (!response.ok) {
-      setStatus("Save failed");
+      // VMT-29: show WHY the save failed (wrong PIN, validation conflict, …)
+      // instead of a generic "Save failed" that hides the cause.
+      const message = await response
+        .json()
+        .then((data: { error?: string }) => data.error)
+        .catch(() => undefined);
+      setStatus(`Save failed: ${message ?? `HTTP ${response.status}`}`);
       return;
     }
     await loadState();

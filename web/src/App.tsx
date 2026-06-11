@@ -1,4 +1,4 @@
-import { Check, Crown, Lock, LockKeyhole, Pencil, RefreshCw, Save, ShieldCheck, Trophy } from "lucide-react";
+import { Check, Crown, Download, Lock, LockKeyhole, Pencil, RefreshCw, Save, ShieldCheck, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import seed from "../../data/seed.json";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
@@ -196,6 +196,15 @@ function LeaderboardPage() {
               <RefreshCw size={15} aria-hidden="true" />
               Refresh
             </button>
+            {/* VMT-28: one-click export of picks, results and standings as Excel */}
+            <a
+              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-ink/20 bg-white px-4 text-sm font-bold shadow-sm"
+              href={`${apiBaseUrl}/api/export.xlsx`}
+              download
+            >
+              <Download size={15} aria-hidden="true" />
+              Excel
+            </a>
           </div>
         </header>
 

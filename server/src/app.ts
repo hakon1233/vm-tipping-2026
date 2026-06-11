@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import seed from "../../data/seed.json" with { type: "json" };
+import { buildExportXlsx } from "./exportXlsx.js";
 import { createStore, type AppStore, type KnockoutRound, type Scoring } from "./store.js";
 
 type AppOptions = {
@@ -57,6 +58,14 @@ export function createApp(options: AppOptions = {}) {
     })
   );
   app.get("/api/leaderboard", (context) => context.json({ leaderboard: store.getLeaderboard() }));
+  // VMT-28: download all live data as an Excel workbook matching the founder's sheet layout
+  app.get("/api/export.xlsx", async (context) => {
+    const file = await buildExportXlsx(store);
+    return context.body(file.buffer as ArrayBuffer, 200, {
+      "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "content-disposition": 'attachment; filename="VMtipping2026-export.xlsx"'
+    });
+  });
   app.get("/api/admin/state", (context) =>
     context.json({
       players: store.listPlayers(),

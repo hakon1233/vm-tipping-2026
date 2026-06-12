@@ -11,6 +11,7 @@ type AppOptions = {
   adminPin?: string;
   leaguePin?: string;
   now?: () => Date;
+  deadlinesDisabled?: boolean;
 };
 
 type InjectInput = {
@@ -31,6 +32,13 @@ export function createApp(options: AppOptions = {}) {
   const adminPin = options.adminPin ?? process.env.ADMIN_PIN ?? "admin";
   const leaguePin = options.leaguePin ?? process.env.LEAGUE_PIN ?? "league";
   const now = options.now ?? (() => new Date());
+  // VMT-29: founder asked to temporarily lift the pick deadlines ("remove the
+  // deadline stuff for a while"). With DEADLINES_DISABLED=1 in .env the VMT-15
+  // group/knockout pick locks are skipped and the flag is reported on
+  // /api/matches so the web UI unlocks too. To re-enable deadline locking:
+  // remove DEADLINES_DISABLED from .env and restart the server
+  // (launchctl kickstart -k gui/$UID/com.vm-tipping.server). No web redeploy needed.
+  const deadlinesDisabled = options.deadlinesDisabled ?? process.env.DEADLINES_DISABLED === "1";
   const app = new Hono();
 
   app.use("/api/*", cors());
@@ -54,7 +62,8 @@ export function createApp(options: AppOptions = {}) {
         { id: "final", label: "Final" },
         { id: "champion", label: "Champion" }
       ],
-      advancement: store.getGroupAdvancement()
+      advancement: store.getGroupAdvancement(),
+      deadlinesDisabled
     })
   );
   app.get("/api/leaderboard", (context) => context.json({ leaderboard: store.getLeaderboard() }));
@@ -117,7 +126,7 @@ export function createApp(options: AppOptions = {}) {
       if (!match || !validOutcomes.has(body.pick ?? "")) {
         return context.json({ error: "Invalid pick payload" }, 400);
       }
-      if (now().getTime() >= Date.parse(match.kickoffAt)) {
+      if (!deadlinesDisabled && now().getTime() >= Date.parse(match.kickoffAt)) {
         return context.json({ error: "Match is locked" }, 409);
       }
 
@@ -126,7 +135,7 @@ export function createApp(options: AppOptions = {}) {
     }
 
     // VMT-15: lock knockout picks after knockoutDeadline
-    if (now().getTime() >= Date.parse(seed.knockoutDeadline)) {
+    if (!deadlinesDisabled && now().getTime() >= Date.parse(seed.knockoutDeadline)) {
       return context.json({ error: "Knockout picks are locked" }, 409);
     }
 

@@ -32,6 +32,12 @@ async function loadConfig() {
 
 const configLoaded = loadConfig();
 
+// VMT-29: the server reports deadlinesDisabled on /api/matches (driven by
+// DEADLINES_DISABLED=1 in the server .env). While true, all pick locking in the
+// UI is bypassed so the founder/players can edit after the deadline. Reverts on
+// its own once the env var is removed and the server restarted — no web change.
+let deadlinesDisabled = false;
+
 const sessionKey = "vm-tipping-session";
 const groupLetters = Object.keys(seed.groups) as GroupLetter[];
 const allTeams = Object.values(seed.groups).flat();
@@ -668,7 +674,8 @@ function PlayerPage() {
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
       .then((response) => response.json())
-      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }> }) => {
+      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }>; deadlinesDisabled?: boolean }) => {
+        deadlinesDisabled = payload.deadlinesDisabled === true; // before setMatches so the re-render sees it
         setMatches(payload.matches);
         if (payload.players) setPlayers(payload.players);
         if (payload.advancement) setAdvancement(payload.advancement);
@@ -1372,7 +1379,7 @@ function resolveR32Slot(
 }
 
 function KnockoutSection({ session, advancement }: { session: Session; advancement: Record<string, { first?: string; second?: string; third?: string }> }) {
-  const locked = Date.now() >= Date.parse(seed.knockoutDeadline);
+  const locked = !deadlinesDisabled && Date.now() >= Date.parse(seed.knockoutDeadline);
 
   // Knockout bracket picks
   const [picks, setPicks] = useState<KnockoutPicks>(() => {
@@ -1808,6 +1815,7 @@ function SaveIndicator({ state }: { state: SaveState }) {
 }
 
 function isLocked(match: Match) {
+  if (deadlinesDisabled) return false; // VMT-29: temporary deadline override
   return Boolean(match.locked) || Date.now() >= Date.parse(match.kickoffAt);
 }
 

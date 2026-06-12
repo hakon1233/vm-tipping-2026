@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createDatabase, seedDatabase } from "../src/db.js";
 
-function testApp(now = new Date("2026-01-01T12:00:00.000Z")) {
+function testApp(now = new Date("2026-01-01T12:00:00.000Z"), options: { deadlinesDisabled?: boolean } = {}) {
   const db = new Database(":memory:");
   createDatabase(db);
   seedDatabase(db);
@@ -15,6 +15,7 @@ function testApp(now = new Date("2026-01-01T12:00:00.000Z")) {
       leaguePin: "league-pin",
       adminPin: "admin-pin",
       now: () => now,
+      ...options,
     }),
     db,
   };
@@ -128,6 +129,53 @@ describe("VM tipping API", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ error: "Match is locked" });
+  });
+
+  // VMT-29: temporary founder-requested deadline override (DEADLINES_DISABLED=1)
+  it("accepts group and knockout picks after the deadline when deadlines are disabled", async () => {
+    const { app } = testApp(new Date("2026-06-12T19:00:00.000Z"), { deadlinesDisabled: true });
+    const { session } = await login(app);
+
+    const groupPick = await app.request("/api/picks", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${session.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ matchId: "A-1", pick: "2" }),
+    });
+    expect(groupPick.status).toBe(200);
+
+    const knockoutPick = await app.request("/api/picks", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${session.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ round: "r32", teamNames: ["Mexico"] }),
+    });
+    expect(knockoutPick.status).toBe(200);
+
+    const matches = await app.request("/api/matches");
+    await expect(matches.json()).resolves.toMatchObject({ deadlinesDisabled: true });
+  });
+
+  it("keeps the deadline lock and reports deadlinesDisabled=false by default", async () => {
+    const { app } = testApp(new Date("2026-06-12T19:00:00.000Z"));
+    const { session } = await login(app);
+
+    const knockoutPick = await app.request("/api/picks", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${session.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ round: "r32", teamNames: ["Mexico"] }),
+    });
+    expect(knockoutPick.status).toBe(409);
+
+    const matches = await app.request("/api/matches");
+    await expect(matches.json()).resolves.toMatchObject({ deadlinesDisabled: false });
   });
 
   it("accepts admin results and computes the leaderboard with duplicate knockout picks counted once", async () => {

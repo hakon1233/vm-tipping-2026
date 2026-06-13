@@ -692,6 +692,9 @@ function PlayerPage() {
   useEffect(() => {
     if (!session) return;
 
+    // Reset immediately so a previous player's picks never show while loading
+    setGroupPicks({});
+
     fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
       headers: { authorization: `Bearer ${session.token}` }
     })
@@ -709,7 +712,7 @@ function PlayerPage() {
         if (payload?.group) setGroupPicks(payload.group);
       })
       .catch(() => setError("Saved picks could not be restored."));
-  }, [session]);
+  }, [session?.playerId]);
 
   const groupedMatches = useMemo(
     () =>
@@ -827,6 +830,9 @@ function PlayerPage() {
   }
 
   function logout() {
+    // Cancel any pending debounced saves so player 1's timer can't fire after switch
+    Object.values(saveTimers.current).forEach((id) => window.clearTimeout(id));
+    saveTimers.current = {};
     localStorage.removeItem(sessionKey);
     setSession(null);
     setGroupPicks({});
@@ -920,7 +926,7 @@ function PlayerPage() {
           ))}
         </section>
 
-        <KnockoutSection session={session} advancement={advancement} />
+        <KnockoutSection key={session.playerId} session={session} advancement={advancement} />
       </section>
     </main>
   );

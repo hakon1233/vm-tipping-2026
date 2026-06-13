@@ -1568,6 +1568,23 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
 
   const r32Bracket = seed.r32Bracket as unknown as R32Match[];
 
+  // Which two slots from the prior round feed each slot in the current round.
+  // R32 (16 slots) → R16 (8 slots): pairs [0,1], [2,3], …
+  // R16 (8 slots)  → QF  (4 slots): pairs [0,1], [2,3], …
+  // QF  (4 slots)  → SF  (2 slots): pairs [0,1], [2,3]
+  // SF  (2 slots)  → Final (1 slot): [0,1]
+  function getMatchupTeams(roundId: KnockoutRoundId, slotIndex: number): [string, string] {
+    const prevRoundId: KnockoutRoundId | null =
+      roundId === "r16" ? "r32" :
+      roundId === "qf"  ? "r16" :
+      roundId === "sf"  ? "qf"  :
+      roundId === "final" ? "sf" : null;
+    if (!prevRoundId) return ["", ""];
+    const a = picks.rounds[prevRoundId][slotIndex * 2] ?? "";
+    const b = picks.rounds[prevRoundId][slotIndex * 2 + 1] ?? "";
+    return [a, b];
+  }
+
   return (
     <>
       <header className="grid gap-5 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
@@ -1739,6 +1756,9 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
                       );
                     })
                   : picks.rounds[round.id].map((teamName, slotIndex) => {
+                      const [teamA, teamB] = getMatchupTeams(round.id, slotIndex);
+                      const matchupKnown = Boolean(teamA && teamB);
+                      const matchupOptions = matchupKnown ? [teamA, teamB] : teamPool;
                       const duplicate = Boolean(teamName && duplicateNames.has(teamName));
                       return (
                         <label
@@ -1749,9 +1769,16 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
                           }
                           key={slotIndex}
                         >
-                          <span className="text-sm font-bold text-ink/70">
-                            {round.label} match {slotIndex + 1}
-                          </span>
+                          <span className="text-xs font-bold text-ink/40">Match {slotIndex + 1}</span>
+                          {matchupKnown ? (
+                            <span className="text-sm font-bold text-ink/80">
+                              {teamA} <span className="font-normal text-ink/40">vs</span> {teamB}
+                            </span>
+                          ) : (
+                            <span className="text-sm font-bold text-ink/40 italic">
+                              Pick {round.id === "r16" ? "R32" : round.id === "qf" ? "R16" : round.id === "sf" ? "QF" : "SF"} winners to see matchup
+                            </span>
+                          )}
                           <select
                             aria-label={`${round.label} match ${slotIndex + 1}`}
                             className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
@@ -1760,7 +1787,7 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
                             onChange={(event) => updateRoundPick(round.id, slotIndex, event.target.value)}
                           >
                             <option value="">Pick advancing team</option>
-                            {teamPool.map((optionTeamName) => (
+                            {matchupOptions.map((optionTeamName) => (
                               <option key={optionTeamName} value={optionTeamName}>
                                 {optionTeamName}
                               </option>

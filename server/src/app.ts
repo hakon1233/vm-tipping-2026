@@ -203,15 +203,24 @@ export function createApp(options: AppOptions = {}) {
 
   app.get("/api/picks/:playerId", (context) => {
     const requestedPlayerId = context.req.param("playerId");
+
+    // VMT-16: picks must never be publicly readable. Option A — require a valid
+    // league session token so an anonymous caller can't enumerate the guessable
+    // player-1…player-8 IDs and read everyone's picks without ever logging in.
+    // Checked before the player lookup so a missing/invalid token returns 401 for
+    // everyone — it can't be used to probe which player IDs exist.
+    const sessionPlayerId = authenticate(context.req.header("authorization"), store);
+    if (!sessionPlayerId) return context.json({ error: "Unauthorized" }, 401);
+
     const player = store.getPlayerById(requestedPlayerId);
     if (!player) return context.json({ error: "Unknown player" }, 404);
 
-    // VMT-16: before the group-stage deadline, only the player themselves can view their picks
-    if (now().getTime() < Date.parse(seed.groupStageDeadline)) {
-      const sessionPlayerId = authenticate(context.req.header("authorization"), store);
-      if (sessionPlayerId !== requestedPlayerId) {
-        return context.json({ error: "Picks are private until the group stage deadline" }, 403);
-      }
+    // Before the group-stage deadline, only the player themselves can view their
+    // own picks, so logged-in players can't copy each other's strategies early.
+    // After the deadline the Overview "house view" shows everyone's picks to any
+    // logged-in player.
+    if (now().getTime() < Date.parse(seed.groupStageDeadline) && sessionPlayerId !== requestedPlayerId) {
+      return context.json({ error: "Picks are private until the group stage deadline" }, 403);
     }
 
     return context.json({

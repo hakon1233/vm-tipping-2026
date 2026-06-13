@@ -114,6 +114,47 @@ describe("VM tipping API", () => {
     });
   });
 
+  // VMT-16: picks must not be publicly readable via guessable player IDs.
+  it("rejects reading picks without a valid session token (Option A)", async () => {
+    const { app } = testApp();
+    const { player } = await login(app);
+
+    const anonymous = await app.request(`/api/picks/${player.id}`);
+    expect(anonymous.status).toBe(401);
+    await expect(anonymous.json()).resolves.toMatchObject({ error: "Unauthorized" });
+
+    const badToken = await app.request(`/api/picks/${player.id}`, {
+      headers: { authorization: "Bearer not-a-real-token" },
+    });
+    expect(badToken.status).toBe(401);
+  });
+
+  it("hides other players' picks from a logged-in player before the group deadline", async () => {
+    const { app } = testApp(new Date("2026-01-01T12:00:00.000Z"));
+    const { session } = await login(app, "Player 1");
+    const other = await login(app, "Player 2");
+
+    const response = await app.request(`/api/picks/${other.player.id}`, {
+      headers: { authorization: `Bearer ${session.token}` },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Picks are private until the group stage deadline",
+    });
+  });
+
+  it("lets a logged-in player view everyone's picks after the deadline (house view)", async () => {
+    const { app } = testApp(new Date("2026-06-12T19:00:00.000Z"));
+    const { session } = await login(app, "Player 1");
+    const other = await login(app, "Player 2");
+
+    const response = await app.request(`/api/picks/${other.player.id}`, {
+      headers: { authorization: `Bearer ${session.token}` },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ player: { name: "Player 2" } });
+  });
+
   it("rejects group picks after kickoff", async () => {
     const { app } = testApp(new Date("2026-06-11T19:00:01.000Z"));
     const { session } = await login(app);

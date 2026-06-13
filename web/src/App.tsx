@@ -321,11 +321,17 @@ function OverviewPage() {
       setChampion(state.champion ?? null);
       setPlayers(state.players ?? []);
 
+      // VMT-16: /api/picks/:playerId now requires a valid league session token.
+      // The Overview is only reachable when logged in, so attach the stored token
+      // to each request — otherwise the house view gets 401s and shows no picks.
+      const session = readSession();
       const picksMap: Record<string, PlayerPicks> = {};
       await Promise.all(
         (state.players ?? []).map(async (player) => {
           try {
-            const res = await fetch(`${apiBaseUrl}/api/picks/${player.id}`);
+            const res = await fetch(`${apiBaseUrl}/api/picks/${player.id}`, {
+              headers: session ? { authorization: `Bearer ${session.token}` } : undefined
+            });
             if (res.ok) {
               const data = (await res.json()) as { group?: Record<string, GroupPickOutcome>; knockout?: Record<string, string[]> };
               picksMap[player.id] = { group: data.group ?? {}, knockout: data.knockout ?? {} };

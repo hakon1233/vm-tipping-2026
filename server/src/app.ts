@@ -275,7 +275,7 @@ export function createApp(options: AppOptions = {}) {
     try {
       store.saveGroupAdvancement(group, position as 1 | 2 | 3, body.team ?? "");
     } catch (err) {
-      return context.json({ error: (err as Error).message }, 409);
+      return context.json({ error: (err as Error).message }, 400);
     }
     return context.json({ ok: true, advancement: store.getGroupAdvancement() });
   });

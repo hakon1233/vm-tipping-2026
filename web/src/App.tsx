@@ -1107,7 +1107,7 @@ function AdminPage() {
                           onChange={(event) => event.target.value && post("/api/admin/advancement", { group, position: 2, team: event.target.value })}
                         >
                           <option value="">— not set —</option>
-                          {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
+                          {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first).map((team) => (
                             <option key={team} value={team}>{team}</option>
                           ))}
                         </select>
@@ -1132,21 +1132,29 @@ function AdminPage() {
                   </span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {groupLetters.map((group) => (
-                    <div className="grid gap-1 rounded border border-ink/10 bg-paper p-3" key={group}>
-                      <span className="text-xs font-black uppercase text-red-700">Group {group}</span>
-                      <select
-                        className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
-                        value={state.advancement?.[group]?.third ?? ""}
-                        onChange={(event) => post("/api/admin/advancement", { group, position: 3, team: event.target.value })}
-                      >
-                        <option value="">— did not advance —</option>
-                        {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
-                          <option key={team} value={team}>{team}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                  {(() => {
+                    const thirdCount = Object.values(state.advancement ?? {}).filter(a => a.third).length;
+                    return groupLetters.map((group) => {
+                      const hasThird = !!state.advancement?.[group]?.third;
+                      const atCap = thirdCount >= 8 && !hasThird;
+                      return (
+                        <div className="grid gap-1 rounded border border-ink/10 bg-paper p-3" key={group}>
+                          <span className="text-xs font-black uppercase text-red-700">Group {group}</span>
+                          <select
+                            className="min-h-9 border border-ink/20 bg-white px-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            value={state.advancement?.[group]?.third ?? ""}
+                            disabled={atCap}
+                            onChange={(event) => post("/api/admin/advancement", { group, position: 3, team: event.target.value })}
+                          >
+                            <option value="">{atCap ? "— cap reached (8/8) —" : "— did not advance —"}</option>
+                            {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first && team !== state.advancement?.[group]?.second).map((team) => (
+                              <option key={team} value={team}>{team}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </section>
 

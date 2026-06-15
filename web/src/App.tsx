@@ -98,9 +98,16 @@ function BrandEyebrow() {
 export function App() {
   const route = useRoute();
   const [configReady, setConfigReady] = useState(false);
+  const [hasSession, setHasSession] = useState(Boolean(readSession()));
 
   useEffect(() => {
     void configLoaded.then(() => setConfigReady(true));
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setHasSession(Boolean(readSession()));
+    window.addEventListener("session-changed", handler);
+    return () => window.removeEventListener("session-changed", handler);
   }, []);
 
   if (!configReady) {
@@ -110,8 +117,6 @@ export function App() {
       </main>
     );
   }
-
-  const hasSession = Boolean(readSession());
 
   const page =
     route === "/admin"
@@ -779,6 +784,7 @@ function PlayerPage() {
     };
     localStorage.setItem(sessionKey, JSON.stringify(nextSession));
     setSession(nextSession);
+    window.dispatchEvent(new Event("session-changed"));
   }
 
   async function saveName() {
@@ -862,6 +868,7 @@ function PlayerPage() {
     localStorage.removeItem(sessionKey);
     setSession(null);
     setGroupPicks({});
+    window.dispatchEvent(new Event("session-changed"));
   }
 
   if (!session) {

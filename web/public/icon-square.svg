@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="VM-tipping">
+  <defs>
+    <linearGradient id="clay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#DD8160"/>
+      <stop offset="1" stop-color="#CD6B49"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#clay)"/>
+  <path d="M126 268 L210 356 L392 156"
+        fill="none" stroke="#FAF9F5" stroke-width="54"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="150" cy="206" r="25" fill="#FAF9F5"/>
+</svg>

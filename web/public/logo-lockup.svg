@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200" role="img" aria-label="VM-tipping 2026">
+  <defs>
+    <linearGradient id="clay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#DD8160"/>
+      <stop offset="1" stop-color="#CD6B49"/>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(20,34)">
+    <rect width="132" height="132" rx="30" ry="30" fill="url(#clay)"/>
+    <g transform="scale(0.2578)">
+      <path d="M126 268 L210 356 L392 156" fill="none" stroke="#FAF9F5" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="150" cy="206" r="25" fill="#FAF9F5"/>
+    </g>
+  </g>
+  <!-- wordmark -->
+  <text x="186" y="112" font-family="'Avenir Next','Avenir','Segoe UI',sans-serif" font-size="74" font-weight="600" letter-spacing="-1.5" fill="#262219">VM-tipping</text>
+  <text x="190" y="158" font-family="'Avenir Next','Avenir','Segoe UI',sans-serif" font-size="30" font-weight="600" letter-spacing="7" fill="#C15F3C">2026</text>
+</svg>

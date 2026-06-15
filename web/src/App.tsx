@@ -69,6 +69,20 @@ function useRoute(): string {
   return route;
 }
 
+// Brand mark + wordmark eyebrow shown in every header. The clay/cream mark and
+// warm clay (#c15f3c) wordmark are the VMT-38 "Claude/Anthropic" brand identity;
+// the icon asset lives in web/public/icon.svg (served under BASE_URL).
+const assetBase = import.meta.env.BASE_URL ?? "/";
+
+function BrandEyebrow() {
+  return (
+    <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-normal text-[#c15f3c]">
+      <img src={`${assetBase}icon.svg`} alt="" className="h-6 w-6 rounded-[6px]" />
+      VM-tipping 2026
+    </p>
+  );
+}
+
 export function App() {
   const route = useRoute();
   const [configReady, setConfigReady] = useState(false);
@@ -185,7 +199,7 @@ function LeaderboardPage() {
       <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 pb-24 sm:px-6 lg:px-8">
         <header className="grid gap-4 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
+            <BrandEyebrow />
             <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Leaderboard</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -384,7 +398,7 @@ function OverviewPage() {
       <section className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-5 px-4 py-5 pb-24 sm:px-6 lg:px-8">
         <header className="grid gap-4 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
+            <BrandEyebrow />
             <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Overview</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -849,7 +863,7 @@ function PlayerPage() {
       <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-5 pb-24 sm:px-6 lg:px-8">
         <header className="grid gap-5 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
+            <BrandEyebrow />
             <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Group-stage picks</h1>
           </div>
           <div className="grid min-w-52 gap-2 rounded-md border border-ink/10 bg-paper p-4 text-sm text-ink/70">
@@ -1273,7 +1287,7 @@ function LoginScreen({
   return (
     <main className="grid min-h-screen place-items-center bg-paper px-4 text-ink">
       <section className="w-full max-w-md rounded-md border border-ink/10 bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
+        <BrandEyebrow />
         <h1 className="mt-2 text-4xl font-black leading-none">Player login</h1>
         <form
           className="mt-6 grid gap-4"
@@ -1609,7 +1623,7 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
     <>
       <header className="grid gap-5 rounded-md border border-ink/10 bg-white px-5 py-6 shadow-sm md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="text-sm font-bold uppercase tracking-normal text-red-700">VM-tipping 2026</p>
+          <BrandEyebrow />
           <h1 className="mt-2 text-4xl font-black leading-none sm:text-6xl">Knockout picks</h1>
         </div>
         <div className="grid min-w-48 gap-2 rounded-md border border-ink/10 bg-paper p-4 text-sm text-ink/70">

@@ -1455,10 +1455,12 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
   const advSaveTimer = useRef<number | undefined>(undefined);
 
   const teamPool = useMemo(() => {
-    const advanced = Object.values(advancement).flatMap((entry) =>
+    const entries = Object.values(advancement);
+    const allGroupsSet = entries.length === 12 && entries.every((e) => e.first && e.second);
+    const advanced = entries.flatMap((entry) =>
       [entry.first, entry.second, entry.third].filter((t): t is string => Boolean(t))
     );
-    return advanced.length > 0 ? advanced.sort() : allTeams;
+    return allGroupsSet ? advanced.sort() : allTeams;
   }, [advancement]);
 
   // VMT-12: load knockout picks + group advancement from server (server is authoritative)

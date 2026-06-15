@@ -32,6 +32,18 @@ async function loadConfig() {
 
 const configLoaded = loadConfig();
 
+// VMT-29 follow-up: same tunnel-URL-rotation retry used by AdminPage, now
+// available to all user-facing fetches. On network failure, re-fetches
+// config.json once (picks up the new Quick Tunnel URL) then retries.
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${apiBaseUrl}${path}`, init);
+  } catch {
+    await loadConfig();
+    return fetch(`${apiBaseUrl}${path}`, init);
+  }
+}
+
 // VMT-29: the server reports deadlinesDisabled on /api/matches (driven by
 // DEADLINES_DISABLED=1 in the server .env). While true, all pick locking in the
 // UI is bypassed so the founder/players can edit after the deadline. Reverts on
@@ -819,7 +831,7 @@ function PlayerPage() {
 
     let response: Response;
     try {
-      response = await fetch(`${apiBaseUrl}/api/picks`, {
+      response = await apiFetch("/api/picks", {
         method: "POST",
         headers: {
           authorization: `Bearer ${session.token}`,
@@ -1498,7 +1510,7 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
       const requests: Promise<Response>[] = knockoutRounds
         .filter((r) => updatedPicks.rounds[r.id].some(Boolean))
         .map((r) =>
-          fetch(`${apiBaseUrl}/api/picks`, {
+          apiFetch("/api/picks", {
             method: "POST",
             headers,
             body: JSON.stringify({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) })
@@ -1506,7 +1518,7 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
         );
       if (updatedPicks.champion) {
         requests.push(
-          fetch(`${apiBaseUrl}/api/picks`, {
+          apiFetch("/api/picks", {
             method: "POST",
             headers,
             body: JSON.stringify({ round: "champion", teamName: updatedPicks.champion })
@@ -1534,7 +1546,7 @@ function KnockoutSection({ session, advancement }: { session: Session; advanceme
 
   async function saveAdvToServer(updated: GroupAdvPicks) {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/picks`, {
+      const response = await apiFetch("/api/picks", {
         method: "POST",
         headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
         body: JSON.stringify({ groupAdvancement: updated })

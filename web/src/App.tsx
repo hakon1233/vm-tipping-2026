@@ -783,9 +783,9 @@ function PlayerPage() {
 
   async function saveName() {
     if (!session) return;
+    setNameError(null);
     const name = nameInput.trim();
     if (!name) return;
-    setNameError(null);
 
     let response: Response;
     try {

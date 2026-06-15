@@ -240,6 +240,10 @@ export function createApp(options: AppOptions = {}) {
     if (!body.matchId || !validOutcomes.has(outcome ?? "")) {
       return context.json({ error: "Invalid result payload" }, 400);
     }
+    const matchExists = store.listMatches().some((m) => m.id === body.matchId);
+    if (!matchExists) {
+      return context.json({ error: "Unknown match" }, 404);
+    }
 
     store.saveResult({ matchId: body.matchId, outcome: outcome as "1" | "X" | "2" });
     return context.json({ ok: true, leaderboard: store.getLeaderboard() });

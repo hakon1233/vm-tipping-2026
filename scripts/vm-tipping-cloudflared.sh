@@ -71,22 +71,17 @@ log "Tunnel URL: $TUNNEL_URL"
 # --- Publish the URL ---
 publish_url() {
   local url="$1"
-  # FAST PATH: direct gh-pages config.json push (live site self-heals in ~30s)
+  # gh-pages config.json is the SINGLE source of truth for the live backend hostname.
+  # Push it directly; the live site self-heals in ~30s, no rebuild. The deploy workflow
+  # is configured to never overwrite this file (keep_files + strips it from the bundle),
+  # so a redeploy can no longer clobber it (VMT-11). The old "slow path" that committed
+  # web/public/config.json to main was removed: it only triggered needless deploys and
+  # was itself a clobber source whenever it lagged the live URL.
   if "$PROJECT_DIR/update-tunnel.sh" "$url" >> "$LOG_FILE" 2>&1; then
-    log "fast path OK: config.json pushed to gh-pages"
+    log "config.json pushed to gh-pages (single source of truth)"
   else
-    log "WARNING: fast path (update-tunnel.sh) failed; relying on slow path"
+    log "WARNING: update-tunnel.sh failed; live site may be stale until next publish"
   fi
-  # SLOW PATH: keep web/public/config.json in sync for the next CI rebuild
-  printf '{"apiBaseUrl": "%s"}\n' "$url" > "$PROJECT_DIR/web/public/config.json"
-  (
-    cd "$PROJECT_DIR" || exit 0
-    if ! "$GIT" diff --quiet web/public/config.json; then
-      "$GIT" add web/public/config.json
-      "$GIT" commit -m "chore: update tunnel URL to $url" >> "$LOG_FILE" 2>&1
-      "$GIT" push origin main >> "$LOG_FILE" 2>&1 && log "slow path OK: web/public/config.json pushed to main"
-    fi
-  ) &
 }
 publish_url "$TUNNEL_URL"
 

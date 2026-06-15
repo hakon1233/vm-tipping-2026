@@ -1248,12 +1248,12 @@ function AdminPage() {
 
               <section className="grid gap-3 border border-ink/10 bg-white p-5 shadow-sm">
                 <h2 className="text-2xl font-black">Scoring</h2>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 overflow-hidden">
                   {Object.entries(state.scoring).map(([key, value]) => (
                     <label className="grid gap-1" key={key}>
                       <span className="text-sm font-bold text-ink/70">{key}</span>
                       <input
-                        className="min-h-10 border border-ink/20 px-3"
+                        className="min-h-10 w-full border border-ink/20 px-3"
                         min={0}
                         type="number"
                         value={value}

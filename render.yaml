@@ -1,0 +1,48 @@
+# render.yaml — Render Blueprint for the VM-tipping backend (VMT-11 fallback path).
+#
+# This is the "zero-credential, permanent hostname" fallback to the on-mini
+# Cloudflare named tunnel. It gives a stable https://<service>.onrender.com URL
+# that never changes across restarts or redeploys. Apply with: Render Dashboard →
+# New → Blueprint → point at this repo. See scripts/render-migration.md for the
+# full runbook (DB upload, config.json switch, verification, rollback).
+#
+# ── CRITICAL: data persistence ───────────────────────────────────────────────
+# This app stores ALL player picks/results in a node:sqlite file. Render's FREE
+# instance type has an EPHEMERAL filesystem — any file written at runtime is lost
+# on every redeploy and on spin-up from idle. A free-tier SQLite deploy WOULD
+# SILENTLY WIPE the league's data. The `disk:` block below is therefore REQUIRED,
+# and a persistent disk on Render needs a PAID instance (Starter, ~$7/mo).
+# Do not remove the disk to "save money" — it is the difference between durable
+# and data-losing. If $7/mo is unacceptable, prefer the on-mini named tunnel
+# (Option A) or Railway (Option C) instead of Render.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: vm-tipping-2026-api
+    runtime: node
+    plan: starter            # REQUIRED for the persistent disk below (free has no disk)
+    region: frankfurt        # closest to the founder/players (NO/EU)
+    branch: main
+    rootDir: .               # monorepo root; build needs shared + server workspaces
+    buildCommand: npm ci && npm run build -w @vm-tipping-2026/shared && npm run build -w server
+    startCommand: node server/dist/index.js
+    healthCheckPath: /health
+    autoDeploy: false        # deploy is gated; flip on only if you want push-to-deploy
+    disk:
+      name: vm-tipping-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.1"     # node:sqlite (DatabaseSync) needs Node >= 22.5
+      - key: PORT
+        value: "10000"       # Render injects its own PORT; index.ts reads process.env.PORT
+      - key: DATABASE_PATH
+        value: /var/data/vm-tipping.sqlite   # on the persistent disk, NOT ephemeral CWD
+      - key: ADMIN_PIN
+        sync: false          # set in dashboard to the real admin PIN (do not commit)
+      - key: LEAGUE_PIN
+        sync: false          # set in dashboard to the real league PIN
+      - key: DEADLINES_DISABLED
+        value: "1"           # matches current .env (VMT-29); flip to remove to re-lock

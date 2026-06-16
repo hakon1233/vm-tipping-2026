@@ -192,6 +192,9 @@ export function createStore(options: StoreOptions) {
         "INSERT INTO champion_actual (id, team) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET team = excluded.team"
       ).run(team);
     },
+    clearActualChampion: () => {
+      db.prepare("DELETE FROM champion_actual WHERE id = 1").run();
+    },
     getActualChampion: () =>
       (db.prepare("SELECT team FROM champion_actual WHERE id = 1").get() as { team: string } | undefined)?.team,
     saveGroupAdvancement: (group: string, position: 1 | 2 | 3, team: string) => {

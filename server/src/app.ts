@@ -268,8 +268,11 @@ export function createApp(options: AppOptions = {}) {
     if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
       return context.json({ error: "Invalid admin PIN" }, 401);
     }
-    const team = body.team ?? body.teamName;
-    if (!team) return context.json({ error: "Champion team is required" }, 400);
+    const team = body.team ?? body.teamName ?? "";
+    if (team === "") {
+      store.clearActualChampion();
+      return context.json({ ok: true, champion: null });
+    }
 
     store.saveActualChampion(team);
     return context.json({ ok: true, champion: store.getActualChampion() });

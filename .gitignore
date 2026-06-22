@@ -11,3 +11,4 @@ build/
 .vite/
 coverage/
 *.tsbuildinfo
+.gstack/

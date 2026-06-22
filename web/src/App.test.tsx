@@ -28,10 +28,11 @@ describe("Knockout page", () => {
     );
   });
 
-  it("renders all knockout rounds and a champion selector", () => {
+  it("renders all knockout rounds and a champion selector", async () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: /knockout picks/i })).toBeInTheDocument();
+    // App gates first render on an async config load (config.json), so await the heading.
+    expect(await screen.findByRole("heading", { name: /knockout picks/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/champion/i)).toBeInTheDocument();
     expect(screen.getAllByLabelText(/Round of 32 match/i)).toHaveLength(16);
     expect(screen.getAllByLabelText(/Round of 16 match/i)).toHaveLength(8);
@@ -44,17 +45,17 @@ describe("Knockout page", () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
 
-    await user.selectOptions(screen.getByLabelText(/champion/i), "Norway");
+    await user.selectOptions(await screen.findByLabelText(/champion/i), "Norway");
     unmount();
     render(<App />);
 
-    expect(screen.getByLabelText(/champion/i)).toHaveValue("Norway");
+    expect(await screen.findByLabelText(/champion/i)).toHaveValue("Norway");
   });
 
   it("flags duplicate picks in the same round with scores-once text", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const r32 = screen.getByTestId("round-r32");
+    const r32 = await screen.findByTestId("round-r32");
     const selects = within(r32).getAllByLabelText(/Round of 32 match/i);
 
     await user.selectOptions(selects[0], "Norway");
@@ -103,7 +104,7 @@ describe("Admin page", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: /admin match room/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /admin match room/i })).toBeInTheDocument();
     await user.type(screen.getByLabelText(/admin pin/i), "admin-pin");
     await user.click(screen.getByRole("button", { name: /unlock admin/i }));
 

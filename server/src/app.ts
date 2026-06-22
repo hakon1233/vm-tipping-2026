@@ -7,7 +7,6 @@ import { createStore, type AppStore, type KnockoutRound, type Scoring } from "./
 
 type AppOptions = {
   store?: AppStore;
-  db?: unknown;
   adminPin?: string;
   leaguePin?: string;
   now?: () => Date;
@@ -27,7 +26,7 @@ export function createApp(options: AppOptions = {}) {
   const store =
     options.store ??
     createStore({
-      databasePath: options.db ? ":memory:" : (process.env.DATABASE_PATH ?? "data/vm-tipping.sqlite")
+      databasePath: process.env.DATABASE_PATH ?? "data/vm-tipping.sqlite"
     });
   const adminPin = options.adminPin ?? process.env.ADMIN_PIN ?? "admin";
   const leaguePin = options.leaguePin ?? process.env.LEAGUE_PIN ?? "league";

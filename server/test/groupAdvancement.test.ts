@@ -1,26 +1,20 @@
-import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
-import { createDatabase, seedDatabase } from "../src/db.js";
+import { createStore } from "../src/store.js";
 
 // VMT-27: a player's 1st and 2nd advancement picks for a group must be distinct
 // teams from that group — otherwise the same team resolves into two R32 slots
 // (e.g. 1J and 2J) and the rendered bracket shows one team in multiple matchups.
 
 function testApp(now = new Date("2026-01-01T12:00:00.000Z")) {
-  const db = new Database(":memory:");
-  createDatabase(db);
-  seedDatabase(db);
-
   return {
     app: createApp({
-      db,
+      store: createStore({ databasePath: ":memory:" }),
       leaguePin: "league-pin",
       adminPin: "admin-pin",
       now: () => now
-    }),
-    db
+    })
   };
 }
 

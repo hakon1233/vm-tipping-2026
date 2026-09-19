@@ -22,8 +22,8 @@
 set -uo pipefail
 
 TUNNEL_NAME="${TUNNEL_NAME:-vm-tipping-2026}"
-PROJECT_DIR="~/projects/work/vm-tipping-2026"
-CLOUDFLARED="/opt/homebrew/bin/cloudflared"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+CLOUDFLARED="${CLOUDFLARED:-$(command -v cloudflared || echo /opt/homebrew/bin/cloudflared)}"
 CF_DIR="$HOME/.cloudflared"
 PLIST_LABEL="com.vm-tipping.named-tunnel"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"

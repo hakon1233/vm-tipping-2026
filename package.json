@@ -12,6 +12,7 @@
     "dev": "concurrently -n shared,server,web -c blue,green,magenta \"npm run dev -w @vm-tipping-2026/shared\" \"npm run dev -w server\" \"npm run dev -w web\"",
     "build": "npm run build -w @vm-tipping-2026/shared && npm run build -w server && npm run build -w web",
     "start": "npm run start -w server",
+    "pretest": "npm run build -w @vm-tipping-2026/shared",
     "test": "vitest run && npm run test -w server"
   },
   "devDependencies": {

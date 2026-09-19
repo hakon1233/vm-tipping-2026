@@ -22,9 +22,9 @@
 
 set -uo pipefail
 
-PROJECT_DIR="~/projects/work/vm-tipping-2026"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 LOG_FILE="/tmp/cloudflared-vm-tipping.log"
-CLOUDFLARED="/opt/homebrew/bin/cloudflared"
+CLOUDFLARED="${CLOUDFLARED:-$(command -v cloudflared || echo /opt/homebrew/bin/cloudflared)}"
 GIT="/usr/bin/git"
 
 # Watchdog tuning

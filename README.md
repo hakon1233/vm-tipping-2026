@@ -1,7 +1,9 @@
 # VM-tipping 2026 — Friends Prediction League
 
-A small, nice-looking web app for 8 friends to predict the **2026 World Cup** and track a
-live leaderboard. Replaces the shared Excel/Google Sheet we use today.
+A small web app for 8 friends to predict the **2026 World Cup** and track a live
+leaderboard. Replaces the shared spreadsheet we used to keep.
+
+**Live:** <https://hakon1233.github.io/vm-tipping-2026-web/>
 
 ## What it does
 
@@ -44,7 +46,9 @@ Players, teams, groups and scoring are seeded from the original spreadsheet — 
 
 ## Status
 
-MVP in progress — built by a Paperclip company (engineer on Claude Opus 4.8). See [`SPEC.md`](SPEC.md).
+Deployed and in use. Group-stage and knockout predictions, scoring and the leaderboard
+all work end to end; the admin surface accepts real results as the tournament plays out.
+See [`SPEC.md`](SPEC.md) for the full specification.
 
 ## Layout
 
@@ -170,3 +174,7 @@ One-time setup:
 Verified locally against the built server: player login → submit a group pick → admin
 enters that match's result → leaderboard reflects the point. In production, run the same
 flow against the deployed Pages site once the tunnel URL is wired.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).

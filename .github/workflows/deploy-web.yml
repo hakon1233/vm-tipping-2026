@@ -1,8 +1,9 @@
 name: Deploy web to GitHub Pages
 
 # Builds the static SPA in /web and publishes it to the PUBLIC deploy repo
-# (e.g. hakon1233/vm-tipping-2026-web), which serves it on GitHub Pages. This
-# source repo is private, so Pages is hosted from the separate public repo.
+# (e.g. hakon1233/vm-tipping-2026-web), which serves it on GitHub Pages.
+# Pages is hosted from that separate repo so it owns the gh-pages branch and
+# the runtime config.json, which a tunnel restart rewrites without a rebuild.
 #
 # One-time setup by the founder (see README "Deploy" section):
 #   Repo variables (Settings → Secrets and variables → Actions → Variables):

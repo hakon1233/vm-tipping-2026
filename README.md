@@ -102,8 +102,10 @@ A floating bottom nav links Picks ↔ Leaderboard. Admin is reachable by URL.
 ## Deploy
 
 Architecture: the **frontend** is a static SPA served by GitHub Pages from a separate
-**public** repo (this source repo is private). The **backend** runs on the mac mini and
-is exposed over HTTPS by a Cloudflare tunnel. The Pages site calls the tunnel URL.
+public repo, which owns the `gh-pages` branch and the runtime `config.json`. The
+**backend** runs on a mac mini, exposed over HTTPS by a Cloudflare tunnel. The Pages
+site calls that tunnel URL, reading it from `config.json` at runtime — so restarting
+the tunnel needs no rebuild.
 
 ### Backend — mac mini
 

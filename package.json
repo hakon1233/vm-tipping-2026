@@ -16,9 +16,11 @@
     "build": "npm run build -w @vm-tipping-2026/shared && npm run build -w server && npm run build -w web",
     "start": "npm run start -w server",
     "test": "npm run build -w @vm-tipping-2026/shared && npm run test --workspaces",
-    "typecheck": "npm run build -w @vm-tipping-2026/shared && npm run typecheck --workspaces"
+    "typecheck": "npm run build -w @vm-tipping-2026/shared && npm run typecheck --workspaces",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15"
@@ -26,6 +28,7 @@
   "overrides": {
     "brace-expansion@1": "^1.1.21",
     "brace-expansion@2": "^2.1.7",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "vite": "^7.3.6"
   }
 }

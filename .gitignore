@@ -12,3 +12,6 @@ build/
 coverage/
 *.tsbuildinfo
 .gstack/
+e2e/.data.sqlite*
+test-results/
+playwright-report/

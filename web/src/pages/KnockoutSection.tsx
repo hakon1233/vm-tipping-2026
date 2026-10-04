@@ -5,6 +5,7 @@ import {
   type GroupAdvPicks,
   type KnockoutPicks,
   type KnockoutRoundId,
+  createEmptyKnockoutPicks,
   duplicateTeamNamesByRound,
   groupAdvFromServer,
   knockoutPickPayloads,
@@ -40,6 +41,8 @@ export function KnockoutSection({
   const [koSaveState, setKoSaveState] = useState<SaveState>("idle");
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
   const saveTimer = useRef<number | undefined>(undefined);
+  // What the server holds, so a save sends only the rounds that changed.
+  const savedPicks = useRef<KnockoutPicks>(createEmptyKnockoutPicks());
 
   // The player's own 1st/2nd place pick per group
   const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => readGroupAdvPicks(window.localStorage, session.playerName));
@@ -52,7 +55,8 @@ export function KnockoutSection({
   useEffect(() => {
     getPlayerPicks(session.token, session.playerId)
       .then((payload) => {
-        setPicks(knockoutPicksFromServer(payload.knockout));
+        savedPicks.current = knockoutPicksFromServer(payload.knockout);
+        setPicks(savedPicks.current);
         setPlayerAdv(groupAdvFromServer(payload.groupAdvancement));
       })
       .catch(() => {});
@@ -75,7 +79,8 @@ export function KnockoutSection({
 
   async function saveToServer(updatedPicks: KnockoutPicks) {
     try {
-      await saveKnockoutPicks(session.token, knockoutPickPayloads(updatedPicks));
+      await saveKnockoutPicks(session.token, knockoutPickPayloads(updatedPicks, savedPicks.current));
+      savedPicks.current = updatedPicks;
       setKoSaveState("saved");
       window.setTimeout(() => setKoSaveState("idle"), 1200);
     } catch {

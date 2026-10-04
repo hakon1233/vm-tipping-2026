@@ -211,7 +211,7 @@ describe("picks on the server", () => {
     expect(groupAdvFromServer({ A: { first: "Mexico" } })).toEqual({ A: { first: "Mexico", second: "" } });
   });
 
-  it("sends one payload per round with picks, then the champion, leaving out empty ones", () => {
+  it("from nothing saved, sends one payload per round with picks, then the champion", () => {
     const picks = createEmptyKnockoutPicks();
     picks.rounds.r32[0] = "Norway";
     picks.rounds.r32[5] = "Brazil";
@@ -225,5 +225,21 @@ describe("picks on the server", () => {
     picks.champion = "Spain";
     expect(knockoutPickPayloads(picks).at(-1)).toEqual({ round: "champion", teamName: "Spain" });
     expect(knockoutPickPayloads(createEmptyKnockoutPicks())).toEqual([]);
+  });
+
+  it("sends only what changed since the last save, including rounds and a champion that were cleared", () => {
+    const saved = createEmptyKnockoutPicks();
+    saved.rounds.r32[0] = "Norway";
+    saved.rounds.sf[1] = "Spain";
+    saved.champion = "Spain";
+    const picks = structuredClone(saved);
+    picks.rounds.sf[1] = "";
+    picks.champion = "";
+
+    expect(knockoutPickPayloads(picks, saved)).toEqual([
+      { round: "sf", teamNames: [] },
+      { round: "champion", teamName: "" }
+    ]);
+    expect(knockoutPickPayloads(saved, saved)).toEqual([]);
   });
 });

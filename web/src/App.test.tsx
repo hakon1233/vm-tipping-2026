@@ -68,6 +68,27 @@ describe("Knockout page", () => {
     await waitFor(() => expect(restored).toHaveValue("Norway"));
   });
 
+  it("saves a cleared champion pick to the server", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    const champion = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(champion).toBeEnabled());
+    await user.selectOptions(champion, "Norway");
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+
+    await user.selectOptions(champion, "");
+    await waitFor(() =>
+      expect(sent.filter((request) => request.method === "POST").at(-1)?.body).toEqual({ round: "champion", teamName: "" })
+    );
+    unmount();
+    window.localStorage.removeItem("vm-tipping-2026:knockout:Alice");
+    render(<App />);
+
+    const restored = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(restored).toBeEnabled());
+    expect(restored).toHaveValue("");
+  });
+
   it("flags duplicate picks in the same round with scores-once text", async () => {
     const user = userEvent.setup();
     render(<App />);

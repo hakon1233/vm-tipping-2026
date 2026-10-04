@@ -180,13 +180,15 @@ export function groupAdvFromServer(record: Record<string, { first?: string; seco
   return picks;
 }
 
-// Rounds with no picks, and an empty champion, are left out, so clearing the
-// last pick of a round is never sent to the server.
-export function knockoutPickPayloads(picks: KnockoutPicks): KnockoutPickPayload[] {
+// The saves that bring the server from `saved` to `picks`: one per round whose
+// picks changed (a round emptied by the player sends an empty list), then the
+// champion if it changed (an empty name clears it).
+export function knockoutPickPayloads(picks: KnockoutPicks, saved: KnockoutPicks = createEmptyKnockoutPicks()): KnockoutPickPayload[] {
+  const filled = (from: KnockoutPicks, round: KnockoutRoundId) => from.rounds[round].filter(Boolean);
   const payloads: KnockoutPickPayload[] = knockoutRounds
-    .filter((round) => picks.rounds[round.id].some(Boolean))
-    .map((round) => ({ round: round.id, teamNames: picks.rounds[round.id].filter(Boolean) }));
-  if (picks.champion) payloads.push({ round: "champion", teamName: picks.champion });
+    .filter((round) => filled(picks, round.id).join("\n") !== filled(saved, round.id).join("\n"))
+    .map((round) => ({ round: round.id, teamNames: filled(picks, round.id) }));
+  if (picks.champion !== saved.champion) payloads.push({ round: "champion", teamName: picks.champion });
   return payloads;
 }
 

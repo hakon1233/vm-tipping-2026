@@ -25,8 +25,8 @@ describe("admin result flow", () => {
     const app = createApp({ store, adminPin: "secret", leaguePin: "league" });
     const response = await app.request("/api/admin/results", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ adminPin: "secret", matchId: match.id, outcome: "1" })
+      headers: { "content-type": "application/json", "x-admin-pin": "secret" },
+      body: JSON.stringify({ matchId: match.id, outcome: "1" })
     });
 
     expect(response.status).toBe(200);
@@ -47,22 +47,22 @@ describe("admin result flow", () => {
     expect(
       await app.request("/api/admin/knockout", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ adminPin: "secret", round: "r16", teams })
+        headers: { "content-type": "application/json", "x-admin-pin": "secret" },
+        body: JSON.stringify({ round: "r16", teams })
       })
     ).toMatchObject({ status: 200 });
     expect(
       await app.request("/api/admin/champion", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ adminPin: "secret", team: teams[0] })
+        headers: { "content-type": "application/json", "x-admin-pin": "secret" },
+        body: JSON.stringify({ team: teams[0] })
       })
     ).toMatchObject({ status: 200 });
     expect(
       await app.request("/api/admin/scoring", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ adminPin: "secret", scoring: { r16Team: 9, champion: 13 } })
+        headers: { "content-type": "application/json", "x-admin-pin": "secret" },
+        body: JSON.stringify({ scoring: { r16Team: 9, champion: 13 } })
       })
     ).toMatchObject({ status: 200 });
 

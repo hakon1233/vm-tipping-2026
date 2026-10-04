@@ -1037,8 +1037,8 @@ function AdminPage() {
     try {
       response = await adminFetch(path, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ adminPin, ...body })
+        headers: { "content-type": "application/json", "x-admin-pin": adminPin },
+        body: JSON.stringify(body)
       });
     } catch {
       setStatus("Save failed: could not reach server");

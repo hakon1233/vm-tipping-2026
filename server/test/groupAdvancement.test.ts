@@ -115,8 +115,8 @@ describe("admin group advancement editing (VMT-29)", () => {
   ) {
     return app.request("/api/admin/advancement", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ adminPin: "admin-pin", ...body })
+      headers: { "content-type": "application/json", "x-admin-pin": "admin-pin" },
+      body: JSON.stringify(body)
     });
   }
 

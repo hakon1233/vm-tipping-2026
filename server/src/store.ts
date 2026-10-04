@@ -244,19 +244,14 @@ export function createStore(options: StoreOptions) {
       });
     },
     getScoring,
-    // VMT-21: SQLite-backed sessions so logins survive server restarts
-    createSession: (token: string, playerId: string) => {
-      db.prepare("INSERT OR REPLACE INTO sessions (token, player_id) VALUES (?, ?)").run(token, playerId);
+    // Sessions live in SQLite so logins survive server restarts. Keyed by token hash.
+    createSession: (tokenHash: string, playerId: string, createdAt: number) => {
+      db.prepare("INSERT OR REPLACE INTO sessions (token, player_id, created_at) VALUES (?, ?, ?)").run(tokenHash, playerId, createdAt);
     },
-    getSession: (token: string): string | undefined => {
-      const row = db.prepare("SELECT player_id FROM sessions WHERE token = ?").get(token) as
-        | { player_id: string }
-        | undefined;
-      return row?.player_id;
-    },
-    deleteSession: (token: string) => {
-      db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
-    },
+    getSession: (tokenHash: string): { playerId: string; createdAt: number } | undefined =>
+      db.prepare("SELECT player_id AS playerId, created_at AS createdAt FROM sessions WHERE token = ?").get(tokenHash) as
+        | { playerId: string; createdAt: number }
+        | undefined,
     savePlayerGroupAdvancement: ({ playerId, group, position, team }: { playerId: string; group: string; position: 1 | 2; team: string }) => {
       if (!team) {
         db.prepare("DELETE FROM player_group_advancement WHERE player_id = ? AND group_name = ? AND position = ?").run(playerId, group.toUpperCase(), position);

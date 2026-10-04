@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import seed from "../../data/seed.json" with { type: "json" };
+import { clientOf, createAuth, type AuthVariables } from "./auth.js";
 import { buildExportXlsx } from "./exportXlsx.js";
 import type { AppStore, KnockoutRound, Scoring } from "./store.js";
 
@@ -13,12 +14,6 @@ type AppOptions = {
   deadlinesDisabled?: boolean;
 };
 
-type InjectInput = {
-  method: string;
-  path: string;
-  body?: unknown;
-};
-
 const validOutcomes = new Set(["1", "X", "2"]);
 const validRounds = new Set(["r32", "r16", "qf", "sf", "final"]);
 
@@ -28,7 +23,8 @@ export function createApp(options: AppOptions) {
   // When set, pick deadlines are skipped and the flag is reported on /api/matches
   // so the web UI unlocks too; no web redeploy needed to toggle it.
   const deadlinesDisabled = options.deadlinesDisabled ?? false;
-  const app = new Hono();
+  const auth = createAuth({ store, adminPin, leaguePin, now });
+  const app = new Hono<{ Variables: AuthVariables }>();
 
   app.use("/api/*", cors());
 
@@ -87,19 +83,15 @@ export function createApp(options: AppOptions) {
 
   app.post("/api/login", async (context) => {
     const body = await context.req.json<{ name?: string; pin?: string }>();
-    if (body.pin !== leaguePin) return context.json({ error: "Invalid league PIN" }, 401);
+    const result = auth.login(body.name, body.pin, clientOf(context));
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    const player = body.name ? store.getPlayerByName(body.name) : undefined;
-    if (!player) return context.json({ error: "Unknown player" }, 404);
-
-    const token = `session-${player.id}-${Math.random().toString(36).slice(2)}`;
-    store.createSession(token, player.id);
+    const { player, token } = result;
     return context.json({ player, session: { token, playerId: player.id } });
   });
 
-  app.post("/api/picks", async (context) => {
-    const playerId = authenticate(context.req.header("authorization"), store);
-    if (!playerId) return context.json({ error: "Unauthorized" }, 401);
+  app.post("/api/picks", auth.requirePlayer, async (context) => {
+    const playerId = context.get("playerId");
 
     const body = await context.req.json<{
       matchId?: string;
@@ -171,9 +163,8 @@ export function createApp(options: AppOptions) {
     return context.json({ error: "Invalid pick payload" }, 400);
   });
 
-  app.patch("/api/player/name", async (context) => {
-    const playerId = authenticate(context.req.header("authorization"), store);
-    if (!playerId) return context.json({ error: "Unauthorized" }, 401);
+  app.patch("/api/player/name", auth.requirePlayer, async (context) => {
+    const playerId = context.get("playerId");
 
     const body = await context.req.json<{ name?: string }>();
     const name = body.name?.trim();
@@ -190,16 +181,11 @@ export function createApp(options: AppOptions) {
     return context.json({ ok: true, player: store.getPlayerById(playerId) });
   });
 
-  app.get("/api/picks/:playerId", (context) => {
+  // Picks are never publicly readable: a session is checked before the player
+  // lookup, so anonymous callers can't probe which player IDs exist.
+  app.get("/api/picks/:playerId", auth.requirePlayer, (context) => {
     const requestedPlayerId = context.req.param("playerId");
-
-    // VMT-16: picks must never be publicly readable. Option A — require a valid
-    // league session token so an anonymous caller can't enumerate the guessable
-    // player-1…player-8 IDs and read everyone's picks without ever logging in.
-    // Checked before the player lookup so a missing/invalid token returns 401 for
-    // everyone — it can't be used to probe which player IDs exist.
-    const sessionPlayerId = authenticate(context.req.header("authorization"), store);
-    if (!sessionPlayerId) return context.json({ error: "Unauthorized" }, 401);
+    const sessionPlayerId = context.get("playerId");
 
     const player = store.getPlayerById(requestedPlayerId);
     if (!player) return context.json({ error: "Unknown player" }, 404);
@@ -220,11 +206,12 @@ export function createApp(options: AppOptions) {
     });
   });
 
+  // Every admin write needs the admin PIN. GET /api/admin/state stays public: it
+  // holds results and standings, never anyone's picks.
+  app.post("/api/admin/*", auth.requireAdmin);
+
   app.post("/api/admin/results", async (context) => {
-    const body = await context.req.json<{ adminPin?: string; matchId?: string; outcome?: string; result?: string }>();
-    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
-      return context.json({ error: "Invalid admin PIN" }, 401);
-    }
+    const body = await context.req.json<{ matchId?: string; outcome?: string; result?: string }>();
     const outcome = body.outcome ?? body.result;
     if (!body.matchId || !validOutcomes.has(outcome ?? "")) {
       return context.json({ error: "Invalid result payload" }, 400);
@@ -239,10 +226,7 @@ export function createApp(options: AppOptions) {
   });
 
   app.post("/api/admin/knockout", async (context) => {
-    const body = await context.req.json<{ adminPin?: string; round?: string; teams?: string[]; teamNames?: string[] }>();
-    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
-      return context.json({ error: "Invalid admin PIN" }, 401);
-    }
+    const body = await context.req.json<{ round?: string; teams?: string[]; teamNames?: string[] }>();
     const teams = body.teams ?? body.teamNames;
     if (!validRounds.has(body.round ?? "") || !Array.isArray(teams)) {
       return context.json({ error: "Invalid knockout payload" }, 400);
@@ -253,10 +237,7 @@ export function createApp(options: AppOptions) {
   });
 
   app.post("/api/admin/champion", async (context) => {
-    const body = await context.req.json<{ adminPin?: string; team?: string; teamName?: string }>();
-    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
-      return context.json({ error: "Invalid admin PIN" }, 401);
-    }
+    const body = await context.req.json<{ team?: string; teamName?: string }>();
     const team = body.team ?? body.teamName ?? "";
     if (team === "") {
       store.clearActualChampion();
@@ -268,10 +249,7 @@ export function createApp(options: AppOptions) {
   });
 
   app.post("/api/admin/advancement", async (context) => {
-    const body = await context.req.json<{ adminPin?: string; group?: string; position?: number; team?: string }>();
-    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
-      return context.json({ error: "Invalid admin PIN" }, 401);
-    }
+    const body = await context.req.json<{ group?: string; position?: number; team?: string }>();
     const group = body.group?.toUpperCase();
     const position = body.position;
     if (!group || (position !== 1 && position !== 2 && position !== 3)) {
@@ -286,10 +264,7 @@ export function createApp(options: AppOptions) {
   });
 
   app.post("/api/admin/scoring", async (context) => {
-    const body = await context.req.json<{ adminPin?: string; scoring?: Partial<Scoring> }>();
-    if (!isAdmin(context.req.header("x-admin-pin"), body.adminPin, adminPin)) {
-      return context.json({ error: "Invalid admin PIN" }, 401);
-    }
+    const body = await context.req.json<{ scoring?: Partial<Scoring> }>();
     if (!body.scoring || typeof body.scoring !== "object") {
       return context.json({ error: "Scoring payload is required" }, 400);
     }
@@ -298,22 +273,5 @@ export function createApp(options: AppOptions) {
     return context.json({ ok: true, scoring: store.getScoring() });
   });
 
-  return Object.assign(app, {
-    inject(input: InjectInput) {
-      return app.request(input.path, {
-        method: input.method,
-        headers: input.body ? { "content-type": "application/json" } : undefined,
-        body: input.body ? JSON.stringify(input.body) : undefined
-      });
-    }
-  });
-}
-
-function authenticate(authorization: string | undefined, store: AppStore) {
-  const token = authorization?.match(/^Bearer (.+)$/)?.[1];
-  return token ? store.getSession(token) : undefined;
-}
-
-function isAdmin(headerPin: string | undefined, bodyPin: string | undefined, expectedPin: string) {
-  return headerPin === expectedPin || bodyPin === expectedPin;
+  return app;
 }

@@ -236,92 +236,39 @@ export function KnockoutSection({
               <div className="grid gap-3 p-4 sm:grid-cols-2">
                 {round.id === "r32"
                   ? r32Bracket.map((match, slotIndex) => {
-                      const currentPick = picks.rounds[round.id][slotIndex];
-                      const choice = r32Choice(match, playerAdv, advancement, currentPick);
-                      const duplicate = Boolean(currentPick && duplicateNames.has(currentPick));
+                      const choice = r32Choice(match, playerAdv, advancement, picks.rounds[round.id][slotIndex]);
                       return (
-                        <label
+                        <PickSlot
                           key={slotIndex}
-                          className={
-                            duplicate
-                              ? "grid gap-2 rounded-md border border-yellow-500 bg-yellow-100 p-3"
-                              : "grid gap-2 rounded-md border border-transparent bg-paper p-3"
-                          }
-                        >
-                          <span className="text-xs font-bold text-ink/40">{match.id.toUpperCase()}</span>
-                          <span className="text-sm font-bold text-ink/80">
-                            {choice.home} <span className="font-normal text-ink/40">vs</span> {choice.away}
-                          </span>
-                          <select
-                            aria-label={`${match.id} winner`}
-                            className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
-                            disabled={locked}
-                            value={currentPick}
-                            onChange={(e) => updateRoundPick(round.id, slotIndex, e.target.value)}
-                          >
-                            <option value="">Pick winner</option>
-                            {choice.options.map((t) => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          {duplicate ? (
-                            <em className="text-sm font-black not-italic text-yellow-800" title="This duplicate team scores once">
-                              scores once
-                            </em>
-                          ) : currentPick ? (
-                            <Check size={16} aria-label="Picked" className="text-green-700" />
-                          ) : null}
-                        </label>
+                          heading={match.id.toUpperCase()}
+                          matchup={[choice.home, choice.away]}
+                          ariaLabel={`${match.id} winner`}
+                          placeholder="Pick winner"
+                          options={choice.options}
+                          value={picks.rounds[round.id][slotIndex]}
+                          duplicateNames={duplicateNames}
+                          locked={locked}
+                          onChange={(teamName) => updateRoundPick(round.id, slotIndex, teamName)}
+                        />
                       );
                     })
                   : picks.rounds[round.id].map((teamName, slotIndex) => {
                       const matchup = matchupTeams(picks, round.id, slotIndex);
-                      const matchupOptions = matchup ?? teamPool;
-                      const duplicate = Boolean(teamName && duplicateNames.has(teamName));
                       return (
-                        <label
-                          className={
-                            duplicate
-                              ? "grid gap-2 rounded-md border border-yellow-500 bg-yellow-100 p-3"
-                              : "grid gap-2 rounded-md border border-transparent bg-paper p-3"
-                          }
+                        <PickSlot
                           key={slotIndex}
-                        >
-                          <span className="text-xs font-bold text-ink/40">Match {slotIndex + 1}</span>
-                          {matchup ? (
-                            <span className="text-sm font-bold text-ink/80">
-                              {matchup[0]} <span className="font-normal text-ink/40">vs</span> {matchup[1]}
-                            </span>
-                          ) : (
-                            <span className="text-sm font-bold text-ink/40 italic">
-                              Pick {previousRound(round.id)?.shortLabel} winners to see matchup
-                            </span>
-                          )}
-                          <select
-                            aria-label={`${round.label} match ${slotIndex + 1}`}
-                            className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
-                            disabled={locked}
-                            value={teamName}
-                            onChange={(event) => updateRoundPick(round.id, slotIndex, event.target.value)}
-                          >
-                            <option value="">Pick advancing team</option>
-                            {matchupOptions.map((optionTeamName) => (
-                              <option key={optionTeamName} value={optionTeamName}>
-                                {optionTeamName}
-                              </option>
-                            ))}
-                          </select>
-                          {duplicate ? (
-                            <em className="text-sm font-black not-italic text-yellow-800" title="This duplicate team scores once">
-                              scores once
-                            </em>
-                          ) : teamName ? (
-                            <Check size={16} aria-label="Picked" className="text-green-700" />
-                          ) : null}
-                        </label>
+                          heading={`Match ${slotIndex + 1}`}
+                          matchup={matchup ?? `Pick ${previousRound(round.id)?.shortLabel} winners to see matchup`}
+                          ariaLabel={`${round.label} match ${slotIndex + 1}`}
+                          placeholder="Pick advancing team"
+                          options={matchup ?? teamPool}
+                          value={teamName}
+                          duplicateNames={duplicateNames}
+                          locked={locked}
+                          onChange={(picked) => updateRoundPick(round.id, slotIndex, picked)}
+                        />
                       );
-                    })
-                }
+                    })}
               </div>
             </article>
           );
@@ -337,5 +284,71 @@ export function KnockoutSection({
         </span>
       </footer>
     </>
+  );
+}
+
+// One knockout slot: which match it is, who plays (or, as a string, why that
+// is not known yet), the pick, and whether that pick repeats a team already
+// picked in the round (it then scores once).
+function PickSlot({
+  heading,
+  matchup,
+  ariaLabel,
+  placeholder,
+  options,
+  value,
+  duplicateNames,
+  locked,
+  onChange
+}: {
+  heading: string;
+  matchup: [string, string] | string;
+  ariaLabel: string;
+  placeholder: string;
+  options: string[];
+  value: string;
+  duplicateNames: Set<string>;
+  locked: boolean;
+  onChange: (teamName: string) => void;
+}) {
+  const duplicate = Boolean(value && duplicateNames.has(value));
+  return (
+    <label
+      className={
+        duplicate
+          ? "grid gap-2 rounded-md border border-yellow-500 bg-yellow-100 p-3"
+          : "grid gap-2 rounded-md border border-transparent bg-paper p-3"
+      }
+    >
+      <span className="text-xs font-bold text-ink/40">{heading}</span>
+      {typeof matchup === "string" ? (
+        <span className="text-sm font-bold text-ink/40 italic">{matchup}</span>
+      ) : (
+        <span className="text-sm font-bold text-ink/80">
+          {matchup[0]} <span className="font-normal text-ink/40">vs</span> {matchup[1]}
+        </span>
+      )}
+      <select
+        aria-label={ariaLabel}
+        className="min-h-11 w-full rounded-md border border-ink/20 bg-white px-3 text-base disabled:opacity-50"
+        disabled={locked}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((teamName) => (
+          <option key={teamName} value={teamName}>
+            {teamName}
+          </option>
+        ))}
+      </select>
+      {duplicate ? (
+        <em className="text-sm font-black not-italic text-yellow-800" title="This duplicate team scores once">
+          scores once
+        </em>
+      ) : value ? (
+        <Check size={16} aria-label="Picked" className="text-green-700" />
+      ) : null}
+    </label>
   );
 }

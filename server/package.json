@@ -8,7 +8,8 @@
     "build": "tsc -b",
     "start": "node --env-file=../.env dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc -b && tsc -p test"
+    "typecheck": "tsc -b && tsc -p test",
+    "seed:demo": "tsx --env-file-if-exists=../.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.17",

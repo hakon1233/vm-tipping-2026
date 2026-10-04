@@ -23,6 +23,7 @@ git clone https://github.com/hakon1233/vm-tipping-2026.git
 cd vm-tipping-2026
 npm ci
 cp .env.example .env
+npm run seed:demo   # optional: made-up picks and half a tournament of results
 npm run dev
 ```
 
@@ -31,7 +32,7 @@ Then open <http://localhost:5173>:
 - **Players.** Log in as any of `Player 1`–`Player 8` with the league PIN `demo-league`. Use the Leaderboard and Overview tabs at the bottom.
 - **Admin.** Go to <http://localhost:5173/#/admin> and use the admin PIN `demo-admin`. Enter results there and watch the leaderboard change.
 
-The API runs on port 3000 and stores its data in `data/vm-tipping.sqlite`; delete that file to start over. Teams, groups, the bracket and the default points come from [`data/seed.json`](data/seed.json).
+The API runs on port 3000 and stores its data in `server/data/vm-tipping.sqlite`; delete that file to start over. Teams, groups, the bracket and the default points come from [`data/seed.json`](data/seed.json).
 
 ## How it plays
 

@@ -46,13 +46,13 @@ export function KnockoutSection({
   const [koSaveState, scheduleSave] = useDebouncedSave(async (updated: KnockoutPicks) => {
     await saveKnockoutPicks(session.token, knockoutPickPayloads(updated, savedPicks.current));
     savedPicks.current = updated;
-  }, locked);
+  }, { locked });
 
   // The player's own 1st/2nd place pick per group
   const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => readGroupAdvPicks(window.localStorage, session.playerName));
   const [advSaveState, scheduleAdvSave] = useDebouncedSave(
     (updated: GroupAdvPicks) => saveGroupAdvancement(session.token, updated),
-    locked
+    { locked }
   );
 
   const teamPool = useMemo(() => knockoutTeamPool(advancement), [advancement]);

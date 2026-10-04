@@ -1,12 +1,19 @@
 import { useRef, useState } from "react";
 import type { SaveState } from "./ui";
 
-// Auto-save for a value the player edits: `schedule(value)` saves it 500 ms
-// after the last call, and `state` tracks that save for SaveIndicator ("saved"
-// falls back to "idle" after 1.2 s). Nothing is saved while `locked`.
-export function useDebouncedSave<T>(save: (value: T) => Promise<unknown>, locked: boolean) {
+type Options = {
+  /** While true, nothing is scheduled. */
+  locked?: boolean;
+  delayMs?: number;
+};
+
+// Auto-save for values the player edits: `schedule(value, key)` saves the value
+// `delayMs` after the last call with the same key (each key, e.g. a match id, has
+// its own timer), and `state` tracks the saves for SaveIndicator ("saved" falls
+// back to "idle" after 1.2 s). `cancel()` drops every pending save.
+export function useDebouncedSave<T>(save: (value: T) => Promise<unknown>, { locked = false, delayMs = 500 }: Options = {}) {
   const [state, setState] = useState<SaveState>("idle");
-  const timer = useRef<number | undefined>(undefined);
+  const timers = useRef(new Map<string, number>());
 
   async function run(value: T) {
     try {
@@ -18,12 +25,23 @@ export function useDebouncedSave<T>(save: (value: T) => Promise<unknown>, locked
     }
   }
 
-  function schedule(value: T) {
+  function schedule(value: T, key = "") {
     if (locked) return;
-    window.clearTimeout(timer.current);
+    window.clearTimeout(timers.current.get(key));
     setState("saving");
-    timer.current = window.setTimeout(() => void run(value), 500);
+    timers.current.set(
+      key,
+      window.setTimeout(() => {
+        timers.current.delete(key);
+        void run(value);
+      }, delayMs)
+    );
   }
 
-  return [state, schedule] as const;
+  function cancel() {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current.clear();
+  }
+
+  return [state, schedule, cancel] as const;
 }

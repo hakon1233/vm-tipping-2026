@@ -1,11 +1,12 @@
 import { Lock, Pencil, Trophy } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
 import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick, type PlayerRef } from "../api";
 import { renameKnockoutPicks } from "../lib/knockout";
 import { type Advancement, groupLetters, isMatchLocked, matchesByGroup, seedPlayerNames, teamsInGroup } from "../lib/tournament";
 import { clearSession, saveSession, useSession, type Session } from "../session";
-import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
+import { BrandEyebrow, SaveIndicator } from "../ui";
+import { useDebouncedSave } from "../useDebouncedSave";
 import { KnockoutSection } from "./KnockoutSection";
 
 const pickOptions: GroupPickOutcome[] = ["1", "X", "2"];
@@ -16,7 +17,6 @@ export function PlayerPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupPicks, setGroupPicks] = useState<Record<string, GroupPickOutcome>>({});
   const [activeGroup, setActiveGroup] = useState<GroupLetter>("A");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -24,7 +24,19 @@ export function PlayerPage() {
   const [advancement, setAdvancement] = useState<Advancement>({});
   // From the server (DEADLINES_DISABLED=1): while true no pick locks.
   const [deadlinesDisabled, setDeadlinesDisabled] = useState(false);
-  const saveTimers = useRef<Record<string, number>>({});
+  // Each match saves on its own short timer; the last pick on a match wins.
+  const [saveState, schedulePickSave, cancelPickSaves] = useDebouncedSave(
+    async ({ token, matchId, pick }: { token: string; matchId: string; pick: GroupPickOutcome }) => {
+      try {
+        await saveGroupPick(token, matchId, pick);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status === 0) setError("Could not reach the server.");
+        else setError(error.status === 409 ? "That match has locked." : "Pick could not be saved.");
+        throw error;
+      }
+    },
+    { delayMs: 250 }
+  );
 
   useEffect(() => {
     getMatches()
@@ -103,35 +115,13 @@ export function PlayerPage() {
 
   function queuePickSave(match: Match, pick: GroupPickOutcome) {
     if (!session || isMatchLocked(match, deadlinesDisabled)) return;
-
     setGroupPicks((current) => ({ ...current, [match.id]: pick }));
-    setSaveState("saving");
-    window.clearTimeout(saveTimers.current[match.id]);
-    saveTimers.current[match.id] = window.setTimeout(() => {
-      void savePick(match.id, pick);
-    }, 250);
-  }
-
-  async function savePick(matchId: string, pick: GroupPickOutcome) {
-    if (!session) return;
-
-    try {
-      await saveGroupPick(session.token, matchId, pick);
-    } catch (error) {
-      setSaveState("error");
-      if (!(error instanceof ApiError) || error.status === 0) setError("Could not reach the server.");
-      else setError(error.status === 409 ? "That match has locked." : "Pick could not be saved.");
-      return;
-    }
-
-    setSaveState("saved");
-    window.setTimeout(() => setSaveState("idle"), 1200);
+    schedulePickSave({ token: session.token, matchId: match.id, pick }, match.id);
   }
 
   function logout() {
-    // Cancel any pending debounced saves so player 1's timer can't fire after switch
-    Object.values(saveTimers.current).forEach((id) => window.clearTimeout(id));
-    saveTimers.current = {};
+    // A pending save must not fire for the next player.
+    cancelPickSaves();
     clearSession();
     setGroupPicks({});
   }

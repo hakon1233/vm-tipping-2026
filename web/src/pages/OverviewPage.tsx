@@ -2,7 +2,8 @@ import { Check, Crown, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { GroupPickOutcome } from "@vm-tipping-2026/shared";
 import { getAdminState, getPlayerPicks, type AdminState, type PlayerPicks, type PlayerRef } from "../api";
-import { groupLetters, matchesByGroup } from "../lib/tournament";
+import { knockoutRounds } from "../lib/knockout";
+import { groupLetters, matchesByGroup, seedScoring } from "../lib/tournament";
 import { readSession } from "../session";
 import { BrandEyebrow } from "../ui";
 
@@ -67,13 +68,12 @@ export function OverviewPage() {
     return { text: pick, cls: "text-red-600 line-through" };
   };
 
-  const koRounds = [
-    { id: "r32", label: "Round of 32", pts: 2 },
-    { id: "r16", label: "Round of 16", pts: 3 },
-    { id: "qf", label: "Quarter-finals", pts: 4 },
-    { id: "sf", label: "Semi-finals", pts: 5 },
-    { id: "final", label: "Final", pts: 6 },
-  ];
+  // This page names the rounds in the plural ("Quarter-finals").
+  const koRounds = knockoutRounds.map((round) => ({
+    id: round.id,
+    label: round.id === "qf" || round.id === "sf" ? `${round.label}s` : round.label,
+    pts: seedScoring[round.pointsKey]
+  }));
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -289,7 +289,7 @@ export function OverviewPage() {
                 <thead>
                   <tr className="border-b border-ink/10 bg-pitch text-white">
                     <th className="px-4 py-3 text-left font-black" colSpan={2}>
-                      Champion — 7 pts
+                      Champion — {seedScoring.champion} pts
                     </th>
                     {players.map((p) => (
                       <th key={p.id} className="px-3 py-3 text-center font-black whitespace-nowrap">{p.name}</th>

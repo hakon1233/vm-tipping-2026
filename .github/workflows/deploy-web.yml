@@ -29,6 +29,10 @@ on:
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
+# The job only reads this repo; it pushes to the deploy repo with DEPLOY_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -58,7 +62,7 @@ jobs:
         run: rm -f ./web/dist/config.json
 
       - name: Publish to public Pages repo
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           personal_token: ${{ secrets.DEPLOY_TOKEN }}
           external_repository: ${{ vars.DEPLOY_REPO || 'hakon1233/vm-tipping-2026-web' }}

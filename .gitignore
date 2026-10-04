@@ -13,6 +13,5 @@ build/
 .vite/
 coverage/
 *.tsbuildinfo
-.gstack/
 test-results/
 playwright-report/

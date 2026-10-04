@@ -19,8 +19,16 @@ describe("server config", () => {
       leaguePin: "league-pin",
       port: 3000,
       databasePath: "data/vm-tipping.sqlite",
-      deadlinesDisabled: false
+      deadlinesDisabled: false,
+      corsOrigins: []
     });
+  });
+
+  it("reads a comma-separated list of allowed web origins", () => {
+    expect(readServerConfig({ ...pins, CORS_ORIGIN: "https://a.example, http://localhost:5173" }).corsOrigins).toEqual([
+      "https://a.example",
+      "http://localhost:5173"
+    ]);
   });
 
   it("reads port, database path and the deadline switch", () => {

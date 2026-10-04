@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
@@ -12,6 +14,7 @@ type AppOptions = {
   leaguePin: string;
   now?: () => Date;
   deadlinesDisabled?: boolean;
+  corsOrigins?: string[];
 };
 
 const validOutcomes = new Set(["1", "X", "2"]);
@@ -27,7 +30,10 @@ export function createApp(options: AppOptions) {
   const picksArePublic = () => now().getTime() >= Date.parse(seed.groupStageDeadline);
   const app = new Hono<{ Variables: AuthVariables }>();
 
-  app.use("/api/*", cors());
+  app.use(secureHeaders());
+  app.use(bodyLimit({ maxSize: 64 * 1024 }));
+  const corsOrigins = options.corsOrigins ?? [];
+  if (corsOrigins.length > 0) app.use("/api/*", cors({ origin: corsOrigins }));
 
   app.get("/health", (context) => context.json({ ok: true, service: "vm-tipping-2026-api" }));
   app.get("/api/matches", (context) =>

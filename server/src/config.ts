@@ -5,6 +5,8 @@ export type ServerConfig = {
   databasePath: string;
   /** Lifts the group/knockout pick deadlines so picks stay editable after kickoff. */
   deadlinesDisabled: boolean;
+  /** Web origins allowed to call the API from a browser. Empty means same-origin only. */
+  corsOrigins: string[];
 };
 
 type Env = Record<string, string | undefined>;
@@ -16,7 +18,8 @@ export function readServerConfig(env: Env): ServerConfig {
     leaguePin: required(env, "LEAGUE_PIN"),
     port: Number(env.PORT ?? 3000),
     databasePath: env.DATABASE_PATH ?? "data/vm-tipping.sqlite",
-    deadlinesDisabled: env.DEADLINES_DISABLED === "1"
+    deadlinesDisabled: env.DEADLINES_DISABLED === "1",
+    corsOrigins: (env.CORS_ORIGIN ?? "").split(",").map((origin) => origin.trim()).filter(Boolean)
   };
 }
 

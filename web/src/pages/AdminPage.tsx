@@ -129,7 +129,7 @@ export function AdminPage() {
                       <label className="grid gap-1">
                         <span className="text-xs font-bold text-ink/60">1st place</span>
                         <select
-                          className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
+                          className="min-h-9 w-full min-w-0 border border-ink/20 bg-white px-2 text-sm"
                           value={state.advancement?.[group]?.first ?? ""}
                           onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 1, event.target.value))}
                         >
@@ -142,7 +142,7 @@ export function AdminPage() {
                       <label className="grid gap-1">
                         <span className="text-xs font-bold text-ink/60">2nd place</span>
                         <select
-                          className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
+                          className="min-h-9 w-full min-w-0 border border-ink/20 bg-white px-2 text-sm"
                           value={state.advancement?.[group]?.second ?? ""}
                           onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 2, event.target.value))}
                         >
@@ -171,7 +171,7 @@ export function AdminPage() {
                     {Object.values(state.advancement ?? {}).filter(a => a.third).length}/8
                   </span>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2">
                   {(() => {
                     const thirdCount = Object.values(state.advancement ?? {}).filter(a => a.third).length;
                     return groupLetters.map((group) => {
@@ -181,7 +181,7 @@ export function AdminPage() {
                         <div className="grid gap-1 rounded border border-ink/10 bg-paper p-3" key={group}>
                           <span className="text-xs font-black uppercase text-red-700">Group {group}</span>
                           <select
-                            className="min-h-9 border border-ink/20 bg-white px-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="min-h-9 w-full min-w-0 border border-ink/20 bg-white px-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                             value={state.advancement?.[group]?.third ?? ""}
                             disabled={atCap}
                             onChange={(event) => save((pin) => admin.saveAdvancement(pin, group, 3, event.target.value))}

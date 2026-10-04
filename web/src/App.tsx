@@ -4,7 +4,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PlayerPage } from "./pages/PlayerPage";
-import { readSession } from "./session";
+import { useSession } from "./session";
 
 // Hash-based routing so the SPA works on a static host (GitHub Pages) under any
 // base path, with deep links and refresh surviving — no server rewrite rules needed.
@@ -27,16 +27,10 @@ function useRoute(): string {
 export function App() {
   const route = useRoute();
   const [configReady, setConfigReady] = useState(false);
-  const [hasSession, setHasSession] = useState(Boolean(readSession()));
+  const hasSession = Boolean(useSession());
 
   useEffect(() => {
     void whenConfigReady().then(() => setConfigReady(true));
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setHasSession(Boolean(readSession()));
-    window.addEventListener("session-changed", handler);
-    return () => window.removeEventListener("session-changed", handler);
   }, []);
 
   if (!configReady) {

@@ -75,4 +75,29 @@ describe("PlayerPage", () => {
     expect(await screen.findByText("Match schedule could not be loaded.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Group-stage picks" })).toBeInTheDocument();
   });
+
+  it("renaming updates the stored session and moves the local knockout picks", async () => {
+    storeSession();
+    const sent = servePlayer();
+    const user = userEvent.setup();
+    render(<PlayerPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit name" }));
+    const nameInput = screen.getByPlaceholderText("Your name");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Alicia");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Alicia")).toBeInTheDocument();
+    const rename = sent.find((request) => request.path === "/api/player/name");
+    expect(rename?.method).toBe("PATCH");
+    expect(rename?.body).toEqual({ name: "Alicia" });
+    expect(JSON.parse(window.localStorage.getItem("vm-tipping-session") ?? "null")).toEqual({
+      token: "test-token",
+      playerId: "p1",
+      playerName: "Alicia"
+    });
+    expect(window.localStorage.getItem("vm-tipping-2026:knockout:Alice")).toBeNull();
+    expect(window.localStorage.getItem("vm-tipping-2026:knockout:Alicia")).not.toBeNull();
+  });
 });

@@ -5,14 +5,14 @@ import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shar
 import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick } from "../api";
 import { renameKnockoutPicks } from "../lib/knockout";
 import { groupLetters } from "../lib/tournament";
-import { readSession, sessionKey, type Session } from "../session";
+import { clearSession, saveSession, useSession, type Session } from "../session";
 import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
 import { KnockoutSection } from "./KnockoutSection";
 
 const pickOptions: GroupPickOutcome[] = ["1", "X", "2"];
 
 export function PlayerPage() {
-  const [session, setSession] = useState<Session | null>(() => readSession());
+  const session = useSession();
   const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupPicks, setGroupPicks] = useState<Record<string, GroupPickOutcome>>({});
@@ -50,8 +50,7 @@ export function PlayerPage() {
       .catch((error: unknown) => {
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
           // Session is invalid or expired — clear it so the user is shown login
-          localStorage.removeItem(sessionKey);
-          setSession(null);
+          clearSession();
           return;
         }
         setError("Saved picks could not be restored.");
@@ -80,9 +79,7 @@ export function PlayerPage() {
       );
       return;
     }
-    localStorage.setItem(sessionKey, JSON.stringify(nextSession));
-    setSession(nextSession);
-    window.dispatchEvent(new Event("session-changed"));
+    saveSession(nextSession);
   }
 
   async function saveName() {
@@ -102,11 +99,9 @@ export function PlayerPage() {
       return;
     }
 
-    // VMT-20: migrate localStorage KO key to new name before updating session
+    // The local knockout-pick cache is keyed by player name, so move it first.
     renameKnockoutPicks(window.localStorage, session.playerName, name);
-    const updated = { ...session, playerName: name };
-    localStorage.setItem(sessionKey, JSON.stringify(updated));
-    setSession(updated);
+    saveSession({ ...session, playerName: name });
     setPlayers((prev) => prev.map((p) => (p.id === session.playerId ? { ...p, name } : p)));
     setEditingName(false);
     setNameError(null);
@@ -143,10 +138,8 @@ export function PlayerPage() {
     // Cancel any pending debounced saves so player 1's timer can't fire after switch
     Object.values(saveTimers.current).forEach((id) => window.clearTimeout(id));
     saveTimers.current = {};
-    localStorage.removeItem(sessionKey);
-    setSession(null);
+    clearSession();
     setGroupPicks({});
-    window.dispatchEvent(new Event("session-changed"));
   }
 
   if (!session) {

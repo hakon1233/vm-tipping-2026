@@ -2,7 +2,7 @@ import { Download, RefreshCw, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LeaderboardRow } from "@vm-tipping-2026/shared";
 import { downloadExport, getLeaderboard } from "../api";
-import { readSession } from "../session";
+import { useSession } from "../session";
 import { BrandEyebrow } from "../ui";
 
 const rankMedal = ["🥇", "🥈", "🥉"] as const;
@@ -37,7 +37,7 @@ export function LeaderboardPage() {
   }, []);
 
   const hasKoData = rows.some((r) => r.knockoutPoints > 0);
-  const session = readSession();
+  const session = useSession();
 
   async function saveExport(token: string) {
     let workbook: Blob;

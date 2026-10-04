@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -46,7 +46,10 @@ describe("Knockout page", () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
 
-    await user.selectOptions(await screen.findByLabelText(/champion/i), "Norway");
+    const champion = await screen.findByLabelText(/champion/i);
+    // Picks unlock once /api/matches reports deadlinesDisabled.
+    await waitFor(() => expect(champion).toBeEnabled());
+    await user.selectOptions(champion, "Norway");
     unmount();
     render(<App />);
 
@@ -57,6 +60,7 @@ describe("Knockout page", () => {
     const user = userEvent.setup();
     render(<App />);
     const r32 = await screen.findByTestId("round-r32");
+    await waitFor(() => expect(within(r32).getByLabelText("m77 winner")).toBeEnabled());
     // m77 (1I v 3rd) and m78 (2E v 2I) can both be won by a group I team.
     await user.selectOptions(within(r32).getByLabelText("m77 winner"), "Norway");
     await user.selectOptions(within(r32).getByLabelText("m78 winner"), "Norway");

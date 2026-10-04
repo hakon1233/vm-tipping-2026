@@ -44,12 +44,6 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   }
 }
 
-// VMT-29: the server reports deadlinesDisabled on /api/matches (driven by
-// DEADLINES_DISABLED=1 in the server .env). While true, all pick locking in the
-// UI is bypassed so the founder/players can edit after the deadline. Reverts on
-// its own once the env var is removed and the server restarted — no web change.
-let deadlinesDisabled = false;
-
 const sessionKey = "vm-tipping-session";
 const groupLetters = Object.keys(seed.groups) as GroupLetter[];
 const allTeams = Object.values(seed.groups).flat();
@@ -723,13 +717,16 @@ function PlayerPage() {
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [advancement, setAdvancement] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
+  // The server reports deadlinesDisabled on /api/matches (DEADLINES_DISABLED=1 in
+  // the server .env). While true, the UI skips every pick lock.
+  const [deadlinesDisabled, setDeadlinesDisabled] = useState(false);
   const saveTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
       .then((response) => response.json())
       .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }>; deadlinesDisabled?: boolean }) => {
-        deadlinesDisabled = payload.deadlinesDisabled === true; // before setMatches so the re-render sees it
+        setDeadlinesDisabled(payload.deadlinesDisabled === true);
         setMatches(payload.matches);
         if (payload.players) setPlayers(payload.players);
         if (payload.advancement) setAdvancement(payload.advancement);
@@ -839,7 +836,7 @@ function PlayerPage() {
   }
 
   function queuePickSave(match: Match, pick: GroupPickOutcome) {
-    if (!session || isLocked(match)) return;
+    if (!session || isLocked(match, deadlinesDisabled)) return;
 
     setGroupPicks((current) => ({ ...current, [match.id]: pick }));
     setSaveState("saving");
@@ -971,12 +968,18 @@ function PlayerPage() {
               key={match.id}
               match={match}
               selectedPick={groupPicks[match.id]}
+              deadlinesDisabled={deadlinesDisabled}
               onPick={(pick) => queuePickSave(match, pick)}
             />
           ))}
         </section>
 
-        <KnockoutSection key={session.playerId} session={session} advancement={advancement} />
+        <KnockoutSection
+          key={session.playerId}
+          session={session}
+          advancement={advancement}
+          deadlinesDisabled={deadlinesDisabled}
+        />
       </section>
     </main>
   );
@@ -1368,13 +1371,15 @@ function LoginScreen({
 function GroupMatchRow({
   match,
   selectedPick,
+  deadlinesDisabled,
   onPick
 }: {
   match: Match;
   selectedPick?: GroupPickOutcome;
+  deadlinesDisabled: boolean;
   onPick: (pick: GroupPickOutcome) => void;
 }) {
-  const locked = isLocked(match);
+  const locked = isLocked(match, deadlinesDisabled);
   const kickoff = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -1448,7 +1453,15 @@ function resolveR32Slot(
   };
 }
 
-function KnockoutSection({ session, advancement }: { session: Session; advancement: Record<string, { first?: string; second?: string; third?: string }> }) {
+function KnockoutSection({
+  session,
+  advancement,
+  deadlinesDisabled
+}: {
+  session: Session;
+  advancement: Record<string, { first?: string; second?: string; third?: string }>;
+  deadlinesDisabled: boolean;
+}) {
   const locked = !deadlinesDisabled && Date.now() >= Date.parse(seed.knockoutDeadline);
 
   // Knockout bracket picks
@@ -1913,8 +1926,8 @@ function SaveIndicator({ state }: { state: SaveState }) {
   return <span className="font-semibold text-ink/60">Auto-save on</span>;
 }
 
-function isLocked(match: Match) {
-  if (deadlinesDisabled) return false; // VMT-29: temporary deadline override
+function isLocked(match: Match, deadlinesDisabled: boolean) {
+  if (deadlinesDisabled) return false;
   return Boolean(match.locked) || Date.now() >= Date.parse(match.kickoffAt);
 }
 

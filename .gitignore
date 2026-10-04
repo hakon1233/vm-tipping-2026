@@ -4,14 +4,15 @@ build/
 .DS_Store
 *.log
 .env
-.env.local
+.env.*
+!.env.example
 *.sqlite
+*.sqlite-*
 *.sqlite3
 *.db
 .vite/
 coverage/
 *.tsbuildinfo
 .gstack/
-e2e/.data.sqlite*
 test-results/
 playwright-report/

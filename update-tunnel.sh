@@ -33,14 +33,17 @@ fi
 echo "Updating API URL to: $TUNNEL_URL"
 
 # --- Clone gh-pages, update config.json, push ---
-GH_TOKEN=$(gh auth token 2>/dev/null || echo "")
-if [ -n "$GH_TOKEN" ]; then
-  CLONE_URL="https://x-access-token:${GH_TOKEN}@github.com/${DEPLOY_REPO}.git"
+# Authenticate through gh's credential helper when gh is logged in, so the token
+# never appears in a URL or the process list; otherwise fall back to SSH.
+if gh auth status >/dev/null 2>&1; then
+  CLONE_URL="https://github.com/${DEPLOY_REPO}.git"
+  GIT_AUTH=(-c credential.helper= -c "credential.helper=!gh auth git-credential")
 else
   CLONE_URL="git@github.com:${DEPLOY_REPO}.git"
+  GIT_AUTH=()
 fi
 
-git clone --depth 1 --branch gh-pages "$CLONE_URL" "$WORK_DIR/repo" 2>/dev/null
+git ${GIT_AUTH[@]+"${GIT_AUTH[@]}"} clone --depth 1 --branch gh-pages "$CLONE_URL" "$WORK_DIR/repo" 2>/dev/null
 echo "{\"apiBaseUrl\":\"${TUNNEL_URL}\"}" > "$WORK_DIR/repo/config.json"
 
 cd "$WORK_DIR/repo"
@@ -49,6 +52,6 @@ git config user.name "VM-tipping CEO"
 git add config.json
 git diff --cached --quiet && { echo "No change needed (URL unchanged)."; exit 0; }
 git commit -m "chore: update tunnel URL to ${TUNNEL_URL}"
-git push origin gh-pages
+git ${GIT_AUTH[@]+"${GIT_AUTH[@]}"} push origin gh-pages
 
 echo "Done — Pages will serve the new API URL within ~30 seconds."

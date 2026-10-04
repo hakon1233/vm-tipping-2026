@@ -2,13 +2,13 @@ import ExcelJS from "exceljs";
 
 import type { AppStore, KnockoutRound } from "./store.js";
 
-// VMT-28: export live app data as an .xlsx whose tabs/columns mirror the founder's
-// workbook (reference/VMtipping2026.xlsx): Group Stage, Knockout, Leaderboard.
-// A "Group Advancement" sheet is added for app-only data the workbook doesn't have.
+// Exports live app data as an .xlsx whose tabs/columns mirror the spreadsheet the
+// league used before this app: Group Stage, Knockout, Leaderboard. A "Group
+// Advancement" sheet is added for app-only data the spreadsheet didn't have.
 
-// The founder's Group Stage tab lists each group's six games in this pairing order
+// The spreadsheet's Group Stage tab lists each group's six games in this pairing order
 // (1v2, 1v3, 1v4, 2v3, 2v4, 3v4). The app stores matches as G-1..G-6 in a different
-// order, so map founder row -> app match id suffix.
+// order, so map spreadsheet row -> app match id suffix.
 const FOUNDER_GAME_ORDER = [1, 3, 5, 6, 4, 2] as const;
 
 const KNOCKOUT_SECTIONS: { round: KnockoutRound; label: string; slots: number; scoringKey: string }[] = [

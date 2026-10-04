@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGroupMatches } from "../shared/src/groupMatches";
+import { buildGroupMatches } from "../src/groupMatches.js";
 
 describe("buildGroupMatches", () => {
   it("expands all 12 groups into 72 stable group-stage matches", () => {

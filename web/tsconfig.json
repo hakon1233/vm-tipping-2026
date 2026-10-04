@@ -5,10 +5,18 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
-    "types": ["vite/client"],
+    "types": [
+      "vite/client",
+      "@testing-library/jest-dom"
+    ],
     "rootDir": "src"
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"],
-  "references": [{ "path": "../shared" }]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ]
 }

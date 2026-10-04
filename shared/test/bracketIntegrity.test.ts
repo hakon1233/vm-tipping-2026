@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import seed from "../data/seed.json" with { type: "json" };
+import seed from "../../data/seed.json" with { type: "json" };
 
 // VMT-27: the R32 bracket must be a valid single-elimination draw — every team
 // (slot) appears in exactly one matchup. This guard fails loudly if the seed

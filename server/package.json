@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -b",
     "start": "node --env-file=../.env dist/index.js",
-    "test": "npm run build -w @vm-tipping-2026/shared && vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc -b && tsc -p test"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.17",

@@ -6,11 +6,10 @@ World Cup 2026 prediction league for eight friends (finished tournament; runs lo
 
 Run from the repo root; each builds `shared/` first, because the other workspaces import its `dist/`.
 
-- `npm run typecheck` — all workspaces, test files included
-- `npm test` — server, web and shared tests, offline
-- `npm run build`, then `npm run test:e2e` — Playwright smoke against the real API on ports 7111/7112
+- `npm run check` — typecheck (test files included), all tests, build
+- `npm run test:e2e` after a build — Playwright smoke against the real API on ports 7111/7112
 
-A change is done when typecheck and `npm test` are green. Run the e2e smoke when you touch login, picks, admin results or the leaderboard.
+The repo runs no GitHub Actions; checks are local. A change is done when `npm run check` is green. Run the e2e smoke when you touch login, picks, admin results or the leaderboard.
 
 ## Where to work
 
@@ -41,5 +40,5 @@ A change is done when typecheck and `npm test` are green. Run the e2e smoke when
 - The 2026 deadlines are in the past. Tests that edit picks pass `deadlinesDisabled` or a fixed `now`; the demo sets `DEADLINES_DISABLED=1`.
 - Other players' picks, and the Excel export, are visible only after the group-stage deadline. Keep that rule when adding routes that return picks.
 - The scripts in `ops/` push to GitHub and expect launchd and cloudflared. Run them only to deploy, never from tests.
-- A push to `main` that touches `web/`, `shared/` or `data/seed.json` triggers the Pages deploy.
+- `deploy-web.yml` runs only when started by hand (`workflow_dispatch`); nothing deploys on a push.
 - The root `package.json` overrides `vite` to one 7.x version. Vitest would otherwise hoist Vite 8, and that breaks `npm run dev` for the React plugin.

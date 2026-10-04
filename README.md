@@ -82,18 +82,18 @@ Three npm workspaces. The server is the only source of truth; the web app keeps 
 
 ## Testing
 
+Checks run locally; the repo runs no GitHub Actions.
+
 ```bash
-npm run typecheck   # all three workspaces, tests included
-npm test            # server, web and shared tests, fully offline
-npm run build
+npm run check       # typecheck (tests included), all tests, build
 npm run test:e2e    # after a build; needs `npx playwright install chromium` once
 ```
+
+`npm run typecheck` and `npm test` also run on their own.
 
 - **Server.** Tests go through `app.request()` against an in-memory SQLite database. They cover login, sessions, the PIN-guess limit, deadlines, pick privacy, validation and the export. Scoring has its own tests with hand-computed values.
 - **Web.** Tests render pages with Testing Library and stub only `fetch`.
 - **End to end.** `test:e2e` starts the real API and the web app, then makes a pick, enters the result as admin and checks the leaderboard.
-
-CI (`.github/workflows/ci.yml`) runs all of this on every push and pull request. The web deploy only runs after it passes.
 
 ## Security
 
@@ -107,7 +107,7 @@ In October 2026 a second agent-driven pass prepared the repo for publishing:
 
 - security hardening
 - splitting the web app into modules
-- the test suite and CI
+- the test suite and one local check script
 - these docs
 
 ## Licence

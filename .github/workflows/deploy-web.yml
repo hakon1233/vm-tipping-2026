@@ -2,27 +2,17 @@ name: Deploy web to GitHub Pages
 
 # Builds web/ and publishes it to the gh-pages branch of a separate deploy repo
 # that serves it on GitHub Pages. Setup and the runtime config.json: ops/README.md.
-# Only the deploy job sees DEPLOY_TOKEN, and it runs no npm code.
+# Manual only: it never runs on a push. Only the deploy job sees DEPLOY_TOKEN,
+# and it runs no npm code.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - "shared/**"
-      - "data/seed.json"
-      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  check:
-    uses: ./.github/workflows/ci.yml
-
   build:
-    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,6 +26,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
 
       - name: Build web
         env:

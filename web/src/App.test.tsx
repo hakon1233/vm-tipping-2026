@@ -22,7 +22,8 @@ describe("Knockout page", () => {
         const url = String(input);
         return {
           ok: true,
-          json: async () => (url.includes("/api/picks/") ? { group: {} } : { matches: [] })
+          // The tournament deadlines are in the past; the server's switch keeps picks editable.
+          json: async () => (url.includes("/api/picks/") ? { group: {} } : { matches: [], deadlinesDisabled: true })
         };
       })
     );
@@ -34,7 +35,7 @@ describe("Knockout page", () => {
     // App gates first render on an async config load (config.json), so await the heading.
     expect(await screen.findByRole("heading", { name: /knockout picks/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/champion/i)).toBeInTheDocument();
-    expect(screen.getAllByLabelText(/Round of 32 match/i)).toHaveLength(16);
+    expect(screen.getAllByLabelText(/^m\d+ winner$/)).toHaveLength(16);
     expect(screen.getAllByLabelText(/Round of 16 match/i)).toHaveLength(8);
     expect(screen.getAllByLabelText(/Quarter-final match/i)).toHaveLength(4);
     expect(screen.getAllByLabelText(/Semi-final match/i)).toHaveLength(2);
@@ -56,10 +57,9 @@ describe("Knockout page", () => {
     const user = userEvent.setup();
     render(<App />);
     const r32 = await screen.findByTestId("round-r32");
-    const selects = within(r32).getAllByLabelText(/Round of 32 match/i);
-
-    await user.selectOptions(selects[0], "Norway");
-    await user.selectOptions(selects[1], "Norway");
+    // m77 (1I v 3rd) and m78 (2E v 2I) can both be won by a group I team.
+    await user.selectOptions(within(r32).getByLabelText("m77 winner"), "Norway");
+    await user.selectOptions(within(r32).getByLabelText("m78 winner"), "Norway");
 
     expect(within(r32).getAllByText(/scores once/i)).toHaveLength(2);
   });

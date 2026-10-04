@@ -1,24 +1,8 @@
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import seed from "../../../data/seed.json";
-import { apiBaseUrl, loadConfig } from "../api";
+import { ApiError, admin, getAdminState, type AdminState } from "../api";
 import { allTeams, groupLetters } from "../lib/tournament";
-
-export type AdminState = {
-  teams: { name: string }[];
-  matches: {
-    id: string;
-    group: string;
-    homeTeam: string;
-    awayTeam: string;
-    result: "1" | "X" | "2" | null;
-  }[];
-  scoring: Record<string, number>;
-  knockout: Record<string, string[]>;
-  champion: string | null;
-  leaderboard: { playerId: string; playerName?: string; name?: string; total: number; rank: number }[];
-  advancement: Record<string, { first?: string; second?: string; third?: string }>;
-};
 
 const adminRounds = [
   { id: "r32", label: "Round of 32" },
@@ -34,32 +18,13 @@ export function AdminPage() {
   const [state, setState] = useState<AdminState | null>(null);
   const [status, setStatus] = useState("Locked");
 
-  // VMT-29: the tunnel URL can rotate while a tab stays open, leaving the
-  // in-memory apiBaseUrl pointing at a dead host. On network failure, re-fetch
-  // config.json once to pick up the new URL and retry.
-  async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
-    try {
-      return await fetch(`${apiBaseUrl}${path}`, init);
-    } catch {
-      await loadConfig();
-      return fetch(`${apiBaseUrl}${path}`, init);
-    }
-  }
-
   async function loadState() {
-    let response: Response;
     try {
-      response = await adminFetch("/api/admin/state");
-    } catch {
-      setStatus("Error: could not reach server");
+      setState(await getAdminState());
+    } catch (error) {
+      setStatus(error instanceof ApiError && error.status !== 0 ? "Error: " + error.status : "Error: could not reach server");
       return;
     }
-    if (!response.ok) {
-      setStatus("Error: " + response.status);
-      return;
-    }
-    const body = (await response.json()) as AdminState;
-    setState(body);
     setStatus("Loaded");
   }
 
@@ -69,28 +34,19 @@ export function AdminPage() {
     await loadState();
   }
 
-  async function post(path: string, body: object) {
+  // The PIN is first checked by the server on a save, so a wrong PIN shows up
+  // here, with the server's reason.
+  async function save(write: (pin: string) => Promise<void>) {
     if (!adminPin) return;
     setStatus("Saving");
-    let response: Response;
     try {
-      response = await adminFetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-admin-pin": adminPin },
-        body: JSON.stringify(body)
-      });
-    } catch {
-      setStatus("Save failed: could not reach server");
-      return;
-    }
-    if (!response.ok) {
-      // VMT-29: show WHY the save failed (wrong PIN, validation conflict, …)
-      // instead of a generic "Save failed" that hides the cause.
-      const message = await response
-        .json()
-        .then((data: { error?: string }) => data.error)
-        .catch(() => undefined);
-      setStatus(`Save failed: ${message ?? `HTTP ${response.status}`}`);
+      await write(adminPin);
+    } catch (error) {
+      setStatus(
+        error instanceof ApiError && error.status !== 0
+          ? `Save failed: ${error.serverMessage ?? `HTTP ${error.status}`}`
+          : "Save failed: could not reach server"
+      );
       return;
     }
     await loadState();
@@ -150,7 +106,7 @@ export function AdminPage() {
                               : "min-h-10 border border-ink/20 bg-white font-black"
                           }
                           key={outcome}
-                          onClick={() => post("/api/admin/results", { matchId: match.id, outcome })}
+                          onClick={() => save((pin) => admin.saveResult(pin, match.id, outcome))}
                           type="button"
                         >
                           {outcome}
@@ -175,7 +131,7 @@ export function AdminPage() {
                         <select
                           className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
                           value={state.advancement?.[group]?.first ?? ""}
-                          onChange={(event) => event.target.value && post("/api/admin/advancement", { group, position: 1, team: event.target.value })}
+                          onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 1, event.target.value))}
                         >
                           <option value="">— not set —</option>
                           {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
@@ -188,7 +144,7 @@ export function AdminPage() {
                         <select
                           className="min-h-9 border border-ink/20 bg-white px-2 text-sm"
                           value={state.advancement?.[group]?.second ?? ""}
-                          onChange={(event) => event.target.value && post("/api/admin/advancement", { group, position: 2, team: event.target.value })}
+                          onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 2, event.target.value))}
                         >
                           <option value="">— not set —</option>
                           {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first).map((team) => (
@@ -228,7 +184,7 @@ export function AdminPage() {
                             className="min-h-9 border border-ink/20 bg-white px-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                             value={state.advancement?.[group]?.third ?? ""}
                             disabled={atCap}
-                            onChange={(event) => post("/api/admin/advancement", { group, position: 3, team: event.target.value })}
+                            onChange={(event) => save((pin) => admin.saveAdvancement(pin, group, 3, event.target.value))}
                           >
                             <option value="">{atCap ? "— cap reached (8/8) —" : "— did not advance —"}</option>
                             {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first && team !== state.advancement?.[group]?.second).map((team) => (
@@ -251,12 +207,10 @@ export function AdminPage() {
                       className="min-h-28 border border-ink/20 bg-white px-3 py-2"
                       multiple
                       value={state.knockout[round.id] ?? []}
-                      onChange={(event) =>
-                        post("/api/admin/knockout", {
-                          round: round.id,
-                          teams: Array.from(event.currentTarget.selectedOptions).map((option) => option.value)
-                        })
-                      }
+                      onChange={(event) => {
+                        const teams = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+                        void save((pin) => admin.saveKnockout(pin, round.id, teams));
+                      }}
                     >
                       {teams.map((team) => (
                         <option key={team} value={team}>
@@ -274,7 +228,7 @@ export function AdminPage() {
                   aria-label="Actual champion"
                   className="min-h-11 border border-ink/20 bg-white px-3"
                   value={state.champion ?? ""}
-                  onChange={(event) => post("/api/admin/champion", { team: event.target.value })}
+                  onChange={(event) => save((pin) => admin.saveChampion(pin, event.target.value))}
                 >
                   <option value="">Choose champion</option>
                   {teams.map((team) => (
@@ -296,7 +250,7 @@ export function AdminPage() {
                         min={0}
                         type="number"
                         value={value}
-                        onChange={(event) => post("/api/admin/scoring", { scoring: { [key]: Number(event.target.value) } })}
+                        onChange={(event) => save((pin) => admin.saveScoring(pin, { [key]: Number(event.target.value) }))}
                       />
                     </label>
                   ))}
@@ -308,7 +262,7 @@ export function AdminPage() {
                 {state.leaderboard.slice(0, 8).map((row) => (
                   <div className="flex items-center justify-between border-b border-ink/10 py-2" key={row.playerId}>
                     <span className="font-bold">
-                      #{row.rank} {row.playerName ?? row.name}
+                      #{row.rank} {row.playerName}
                     </span>
                     <strong>{row.total}</strong>
                   </div>

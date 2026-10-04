@@ -1,23 +1,9 @@
 import { Download, RefreshCw, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
-import { apiBaseUrl, apiFetch } from "../api";
+import type { LeaderboardRow } from "@vm-tipping-2026/shared";
+import { downloadExport, getLeaderboard } from "../api";
 import { readSession } from "../session";
 import { BrandEyebrow } from "../ui";
-
-type LeaderboardRow = {
-  playerId: string;
-  playerName: string;
-  rank: number;
-  groupPoints: number;
-  r32Points: number;
-  r16Points: number;
-  qfPoints: number;
-  sfPoints: number;
-  finalPoints: number;
-  championPoints: number;
-  knockoutPoints: number;
-  total: number;
-};
 
 const rankMedal = ["🥇", "🥈", "🥉"] as const;
 const rankClass = [
@@ -34,10 +20,7 @@ export function LeaderboardPage() {
 
   async function loadLeaderboard() {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/leaderboard`);
-      if (!response.ok) throw new Error("Failed to load");
-      const body = (await response.json()) as { leaderboard: LeaderboardRow[] };
-      setRows(body.leaderboard);
+      setRows(await getLeaderboard());
       setLastRefreshed(new Date());
       setError(null);
     } catch {
@@ -56,13 +39,15 @@ export function LeaderboardPage() {
   const hasKoData = rows.some((r) => r.knockoutPoints > 0);
   const session = readSession();
 
-  async function downloadExport(token: string) {
-    const response = await apiFetch("/api/export.xlsx", { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
-    if (!response?.ok) {
+  async function saveExport(token: string) {
+    let workbook: Blob;
+    try {
+      workbook = await downloadExport(token);
+    } catch {
       setError("The Excel export could not be downloaded.");
       return;
     }
-    const url = URL.createObjectURL(await response.blob());
+    const url = URL.createObjectURL(workbook);
     const link = document.createElement("a");
     link.href = url;
     link.download = "VMtipping2026-export.xlsx";
@@ -96,7 +81,7 @@ export function LeaderboardPage() {
             {session ? (
               <button
                 className="inline-flex min-h-10 items-center gap-2 rounded-md border border-ink/20 bg-white px-4 text-sm font-bold shadow-sm"
-                onClick={() => void downloadExport(session.token)}
+                onClick={() => void saveExport(session.token)}
                 type="button"
               >
                 <Download size={15} aria-hidden="true" />

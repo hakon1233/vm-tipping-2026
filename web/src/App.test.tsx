@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { type SentRequest, storeSession, stubFetch } from "./test/fakeFetch";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,24 +10,27 @@ afterEach(() => {
 });
 
 describe("Knockout page", () => {
+  let sent: SentRequest[];
+
   beforeEach(() => {
     window.history.pushState({}, "", "/");
     window.localStorage.clear();
-    window.localStorage.setItem(
-      "vm-tipping-session",
-      JSON.stringify({ token: "test-token", playerId: "player-1", playerName: "Alice" })
-    );
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        return {
-          ok: true,
-          // The tournament deadlines are in the past; the server's switch keeps picks editable.
-          json: async () => (url.includes("/api/picks/") ? { group: {} } : { matches: [], deadlinesDisabled: true })
-        };
-      })
-    );
+    storeSession();
+    // A small picks server: knockout picks POSTed are served back on GET.
+    const knockout: Record<string, string[]> = {};
+    sent = stubFetch((request) => {
+      if (request.path === "/api/matches") {
+        // The tournament deadlines are in the past; the server's switch keeps picks editable.
+        return { json: { matches: [], players: [], advancement: {}, deadlinesDisabled: true } };
+      }
+      if (request.path === "/api/picks" && request.method === "POST") {
+        const body = request.body as { round?: string; teamName?: string; teamNames?: string[] };
+        if (body.round) knockout[body.round] = body.teamName ? [body.teamName] : (body.teamNames ?? []);
+        return { json: { ok: true } };
+      }
+      if (request.path.startsWith("/api/picks/")) return { json: { group: {}, knockout, groupAdvancement: {} } };
+      return { json: {} };
+    });
   });
 
   it("renders all knockout rounds and a champion selector", async () => {
@@ -50,10 +54,18 @@ describe("Knockout page", () => {
     // Picks unlock once /api/matches reports deadlinesDisabled.
     await waitFor(() => expect(champion).toBeEnabled());
     await user.selectOptions(champion, "Norway");
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(sent.filter((request) => request.method === "POST").map((request) => request.body)).toContainEqual({
+      round: "champion",
+      teamName: "Norway"
+    });
     unmount();
+    // The server is authoritative: drop the local cache and restore from it.
+    window.localStorage.removeItem("vm-tipping-2026:knockout:Alice");
     render(<App />);
 
-    expect(await screen.findByLabelText(/champion/i)).toHaveValue("Norway");
+    const restored = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(restored).toHaveValue("Norway"));
   });
 
   it("flags duplicate picks in the same round with scores-once text", async () => {

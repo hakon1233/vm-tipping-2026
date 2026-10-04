@@ -1,19 +1,12 @@
 import { Check, Crown, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { GroupLetter, GroupPickOutcome } from "@vm-tipping-2026/shared";
-import { apiBaseUrl } from "../api";
+import { getAdminState, getPlayerPicks, type AdminState } from "../api";
 import { groupLetters } from "../lib/tournament";
 import { readSession } from "../session";
 import { BrandEyebrow } from "../ui";
-import type { AdminState } from "./AdminPage";
 
-type OverviewMatch = {
-  id: string;
-  group: string;
-  homeTeam: string;
-  awayTeam: string;
-  result: "1" | "X" | "2" | null;
-};
+type OverviewMatch = AdminState["matches"][number];
 
 type PlayerPicks = {
   group: Record<string, GroupPickOutcome>;
@@ -33,35 +26,30 @@ export function OverviewPage() {
 
   async function load() {
     try {
-      const stateRes = await fetch(`${apiBaseUrl}/api/admin/state`);
-      if (!stateRes.ok) throw new Error("Failed to load");
-      const state = (await stateRes.json()) as AdminState & { players: { id: string; name: string }[] };
+      const state = await getAdminState();
 
       setMatches(state.matches);
-      setKnockout(state.knockout ?? {});
-      setChampion(state.champion ?? null);
-      setPlayers(state.players ?? []);
+      setKnockout(state.knockout);
+      setChampion(state.champion);
+      setPlayers(state.players);
 
-      // VMT-16: /api/picks/:playerId now requires a valid league session token.
-      // The Overview is only reachable when logged in, so attach the stored token
-      // to each request — otherwise the house view gets 401s and shows no picks.
+      // Reading picks needs a session; the Overview route is only shown to a
+      // logged-in player. Before the group-stage deadline the server refuses
+      // other players' picks, so their columns stay empty.
       const session = readSession();
       const picksMap: Record<string, PlayerPicks> = {};
-      await Promise.all(
-        (state.players ?? []).map(async (player) => {
-          try {
-            const res = await fetch(`${apiBaseUrl}/api/picks/${player.id}`, {
-              headers: session ? { authorization: `Bearer ${session.token}` } : undefined
-            });
-            if (res.ok) {
-              const data = (await res.json()) as { group?: Record<string, GroupPickOutcome>; knockout?: Record<string, string[]> };
-              picksMap[player.id] = { group: data.group ?? {}, knockout: data.knockout ?? {} };
+      if (session) {
+        await Promise.all(
+          state.players.map(async (player) => {
+            try {
+              const picks = await getPlayerPicks(session.token, player.id);
+              picksMap[player.id] = { group: picks.group, knockout: picks.knockout };
+            } catch {
+              // skip failing player
             }
-          } catch {
-            // skip failing player
-          }
-        })
-      );
+          })
+        );
+      }
       setAllPicks(picksMap);
       setLastRefreshed(new Date());
       setError(null);

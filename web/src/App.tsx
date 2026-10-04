@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { configLoaded } from "./api";
+import { whenConfigReady } from "./api";
 import { AdminPage } from "./pages/AdminPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -30,7 +30,7 @@ export function App() {
   const [hasSession, setHasSession] = useState(Boolean(readSession()));
 
   useEffect(() => {
-    void configLoaded.then(() => setConfigReady(true));
+    void whenConfigReady().then(() => setConfigReady(true));
   }, []);
 
   useEffect(() => {

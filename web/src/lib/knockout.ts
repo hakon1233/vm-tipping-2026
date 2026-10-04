@@ -13,6 +13,14 @@ export type KnockoutPicks = {
   champion: string;
 };
 
+// A player's own 1st/2nd place pick per group letter; "" means not picked.
+export type GroupAdvPicks = Record<string, { first: string; second: string }>;
+
+// One POST /api/picks body for the knockout stage.
+export type KnockoutPickPayload =
+  | { round: KnockoutRoundId; teamNames: string[] }
+  | { round: "champion"; teamName: string };
+
 export type KnockoutStorage = {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;

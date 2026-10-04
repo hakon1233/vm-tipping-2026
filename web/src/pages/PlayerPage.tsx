@@ -2,7 +2,7 @@ import { Lock, Pencil, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import seed from "../../../data/seed.json";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
-import { apiBaseUrl, apiFetch } from "../api";
+import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick } from "../api";
 import { renameKnockoutPicks } from "../lib/knockout";
 import { groupLetters } from "../lib/tournament";
 import { readSession, sessionKey, type Session } from "../session";
@@ -29,16 +29,12 @@ export function PlayerPage() {
   const saveTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/matches`)
-      .then((response) => {
-        if (!response.ok) throw new Error("matches fetch failed");
-        return response.json();
-      })
-      .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }>; deadlinesDisabled?: boolean }) => {
-        setDeadlinesDisabled(payload.deadlinesDisabled === true);
+    getMatches()
+      .then((payload) => {
+        setDeadlinesDisabled(payload.deadlinesDisabled);
         setMatches(payload.matches);
-        if (payload.players) setPlayers(payload.players);
-        if (payload.advancement) setAdvancement(payload.advancement);
+        setPlayers(payload.players);
+        setAdvancement(payload.advancement);
       })
       .catch(() => setError("Match schedule could not be loaded."));
   }, []);
@@ -49,23 +45,17 @@ export function PlayerPage() {
     // Reset immediately so a previous player's picks never show while loading
     setGroupPicks({});
 
-    fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
-      headers: { authorization: `Bearer ${session.token}` }
-    })
-      .then((response) => {
-        if (response.status === 401 || response.status === 403) {
+    getPlayerPicks(session.token, session.playerId)
+      .then((payload) => setGroupPicks(payload.group))
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
           // Session is invalid or expired — clear it so the user is shown login
           localStorage.removeItem(sessionKey);
           setSession(null);
-          return null;
+          return;
         }
-        if (!response.ok) throw new Error("picks fetch failed");
-        return response.json();
-      })
-      .then((payload: { group: Record<string, GroupPickOutcome> } | null) => {
-        if (payload?.group) setGroupPicks(payload.group);
-      })
-      .catch(() => setError("Saved picks could not be restored."));
+        setError("Saved picks could not be restored.");
+      });
   }, [session?.playerId]);
 
   const groupedMatches = useMemo(
@@ -79,32 +69,17 @@ export function PlayerPage() {
 
   async function login(name: string, pin: string) {
     setError(null);
-    let response: Response;
+    let nextSession: Session;
     try {
-      response = await fetch(`${apiBaseUrl}/api/login`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, pin })
-      });
-    } catch {
-      setError("Could not reach the server. Check your connection.");
+      nextSession = await requestLogin(name, pin);
+    } catch (error) {
+      setError(
+        error instanceof ApiError && error.status === 0
+          ? "Could not reach the server. Check your connection."
+          : "Name or league PIN was not accepted."
+      );
       return;
     }
-
-    if (!response.ok) {
-      setError("Name or league PIN was not accepted.");
-      return;
-    }
-
-    const body = (await response.json()) as {
-      player: { id: string; name: string };
-      session: { token: string; playerId: string };
-    };
-    const nextSession = {
-      token: body.session.token,
-      playerId: body.session.playerId,
-      playerName: body.player.name
-    };
     localStorage.setItem(sessionKey, JSON.stringify(nextSession));
     setSession(nextSession);
     window.dispatchEvent(new Event("session-changed"));
@@ -116,21 +91,14 @@ export function PlayerPage() {
     const name = nameInput.trim();
     if (!name) return;
 
-    let response: Response;
     try {
-      response = await fetch(`${apiBaseUrl}/api/player/name`, {
-        method: "PATCH",
-        headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
-        body: JSON.stringify({ name })
-      });
-    } catch {
-      setNameError("Could not reach the server.");
-      return;
-    }
-
-    if (!response.ok) {
-      const body = (await response.json()) as { error?: string };
-      setNameError(body.error ?? "Could not save name.");
+      await renamePlayer(session.token, name);
+    } catch (error) {
+      setNameError(
+        error instanceof ApiError && error.status !== 0
+          ? (error.serverMessage ?? "Could not save name.")
+          : "Could not reach the server."
+      );
       return;
     }
 
@@ -158,25 +126,12 @@ export function PlayerPage() {
   async function savePick(matchId: string, pick: GroupPickOutcome) {
     if (!session) return;
 
-    let response: Response;
     try {
-      response = await apiFetch("/api/picks", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${session.token}`,
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({ matchId, pick })
-      });
-    } catch {
+      await saveGroupPick(session.token, matchId, pick);
+    } catch (error) {
       setSaveState("error");
-      setError("Could not reach the server.");
-      return;
-    }
-
-    if (!response.ok) {
-      setSaveState("error");
-      setError(response.status === 409 ? "That match has locked." : "Pick could not be saved.");
+      if (!(error instanceof ApiError) || error.status === 0) setError("Could not reach the server.");
+      else setError(error.status === 409 ? "That match has locked." : "Pick could not be saved.");
       return;
     }
 

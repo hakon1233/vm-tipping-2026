@@ -1,8 +1,10 @@
 import { Check, Crown, LockKeyhole, Save, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import seed from "../../../data/seed.json";
-import { apiBaseUrl, apiFetch } from "../api";
+import { getPlayerPicks, saveGroupAdvancement, saveKnockoutPicks } from "../api";
 import {
+  GroupAdvPicks,
+  KnockoutPickPayload,
   KnockoutRoundId,
   KnockoutPicks,
   createEmptyKnockoutPicks,
@@ -15,7 +17,6 @@ import { allTeams, groupLetters } from "../lib/tournament";
 import type { Session } from "../session";
 import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
 
-type GroupAdvPicks = Record<string, { first: string; second: string }>;
 type R32Match = { id: string; slot1: string; slot2: string; slot2Groups?: string[] };
 
 function resolveR32Slot(
@@ -85,33 +86,26 @@ export function KnockoutSection({
 
   // VMT-12: load knockout picks + group advancement from server (server is authoritative)
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/picks/${session.playerId}`, {
-      headers: { authorization: `Bearer ${session.token}` }
-    })
-      .then((r) => r.json())
-      .then((payload: { knockout?: Record<string, string[]>; groupAdvancement?: Record<string, { first?: string; second?: string }> }) => {
-        if (payload.knockout) {
-          const serverPicks: KnockoutPicks = {
-            champion: payload.knockout.champion?.[0] ?? "",
-            rounds: knockoutRounds.reduce(
-              (acc, r) => ({
-                ...acc,
-                [r.id]: Array.from({ length: r.slotCount }, (_, i) => payload.knockout![r.id]?.[i] ?? "")
-              }),
-              {} as Record<KnockoutRoundId, string[]>
-            )
-          };
-          setPicks(serverPicks);
-          writeKnockoutPicks(window.localStorage, session.playerName, serverPicks);
+    getPlayerPicks(session.token, session.playerId)
+      .then((payload) => {
+        const serverPicks: KnockoutPicks = {
+          champion: payload.knockout.champion?.[0] ?? "",
+          rounds: knockoutRounds.reduce(
+            (acc, r) => ({
+              ...acc,
+              [r.id]: Array.from({ length: r.slotCount }, (_, i) => payload.knockout[r.id]?.[i] ?? "")
+            }),
+            {} as Record<KnockoutRoundId, string[]>
+          )
+        };
+        setPicks(serverPicks);
+        writeKnockoutPicks(window.localStorage, session.playerName, serverPicks);
+        const serverAdv: GroupAdvPicks = {};
+        for (const [g, v] of Object.entries(payload.groupAdvancement)) {
+          serverAdv[g] = { first: v.first ?? "", second: v.second ?? "" };
         }
-        if (payload.groupAdvancement) {
-          const serverAdv: GroupAdvPicks = {};
-          for (const [g, v] of Object.entries(payload.groupAdvancement)) {
-            serverAdv[g] = { first: v.first ?? "", second: v.second ?? "" };
-          }
-          setPlayerAdv(serverAdv);
-          localStorage.setItem(advKey, JSON.stringify(serverAdv));
-        }
+        setPlayerAdv(serverAdv);
+        localStorage.setItem(advKey, JSON.stringify(serverAdv));
       })
       .catch(() => {});
   }, [session.playerId]);
@@ -135,32 +129,13 @@ export function KnockoutSection({
 
   async function saveToServer(updatedPicks: KnockoutPicks) {
     try {
-      const headers = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
-      const requests: Promise<Response>[] = knockoutRounds
+      const payloads: KnockoutPickPayload[] = knockoutRounds
         .filter((r) => updatedPicks.rounds[r.id].some(Boolean))
-        .map((r) =>
-          apiFetch("/api/picks", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) })
-          })
-        );
-      if (updatedPicks.champion) {
-        requests.push(
-          apiFetch("/api/picks", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ round: "champion", teamName: updatedPicks.champion })
-          })
-        );
-      }
-      const responses = await Promise.all(requests);
-      if (responses.every((r) => r.ok)) {
-        setKoSaveState("saved");
-        window.setTimeout(() => setKoSaveState("idle"), 1200);
-      } else {
-        setKoSaveState("error");
-      }
+        .map((r) => ({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) }));
+      if (updatedPicks.champion) payloads.push({ round: "champion", teamName: updatedPicks.champion });
+      await saveKnockoutPicks(session.token, payloads);
+      setKoSaveState("saved");
+      window.setTimeout(() => setKoSaveState("idle"), 1200);
     } catch {
       setKoSaveState("error");
     }
@@ -175,17 +150,9 @@ export function KnockoutSection({
 
   async function saveAdvToServer(updated: GroupAdvPicks) {
     try {
-      const response = await apiFetch("/api/picks", {
-        method: "POST",
-        headers: { authorization: `Bearer ${session.token}`, "content-type": "application/json" },
-        body: JSON.stringify({ groupAdvancement: updated })
-      });
-      if (response.ok) {
-        setAdvSaveState("saved");
-        window.setTimeout(() => setAdvSaveState("idle"), 1200);
-      } else {
-        setAdvSaveState("error");
-      }
+      await saveGroupAdvancement(session.token, updated);
+      setAdvSaveState("saved");
+      window.setTimeout(() => setAdvSaveState("idle"), 1200);
     } catch {
       setAdvSaveState("error");
     }

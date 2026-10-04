@@ -122,8 +122,10 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
 }
 
 // Public: results and standings, never anyone's picks.
-export async function getAdminState(): Promise<AdminState> {
-  return (await (await request("/api/admin/state")).json()) as AdminState;
+// Public without a PIN; with one, the server rejects a wrong PIN (401).
+export async function getAdminState(adminPin?: string): Promise<AdminState> {
+  const credentials = adminPin === undefined ? undefined : { adminPin };
+  return (await (await request("/api/admin/state", { credentials })).json()) as AdminState;
 }
 
 export async function getPlayerPicks(token: string, playerId: string): Promise<PlayerPicks> {

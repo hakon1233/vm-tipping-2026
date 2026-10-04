@@ -17,7 +17,10 @@ const adminState = {
 
 function serveAdmin(onWrite: (request: SentRequest) => Reply = () => ({ json: { ok: true } })) {
   return stubFetch((request) => {
-    if (request.path === "/api/admin/state") return { json: adminState };
+    if (request.path === "/api/admin/state") {
+      const pin = request.headers.get("x-admin-pin");
+      return pin === null || pin === "admin-pin" ? { json: adminState } : { status: 401, json: { error: "Invalid admin PIN" } };
+    }
     if (request.path.startsWith("/api/admin/")) return onWrite(request);
     return { json: {} };
   });
@@ -44,6 +47,18 @@ describe("AdminPage", () => {
     expect(screen.getByRole("heading", { name: /scoring/i })).toBeInTheDocument();
   });
 
+  it("stays locked and says so when the PIN is wrong", async () => {
+    const sent = serveAdmin();
+    const user = userEvent.setup();
+    render(<AdminPage />);
+    await user.type(screen.getByLabelText(/admin pin/i), "guess");
+    await user.click(screen.getByRole("button", { name: /unlock admin/i }));
+
+    expect(await screen.findByText("Invalid admin PIN")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /group results/i })).not.toBeInTheDocument();
+    expect(sent.find((request) => request.path === "/api/admin/state")?.headers.get("x-admin-pin")).toBe("guess");
+  });
+
   it("sends the admin PIN in the x-admin-pin header when saving a result", async () => {
     const sent = serveAdmin();
     const user = await unlock("admin-pin");
@@ -58,11 +73,11 @@ describe("AdminPage", () => {
   });
 
   it("shows the server's reason when a save is refused", async () => {
-    serveAdmin(() => ({ status: 401, json: { error: "Admin PIN required" } }));
-    const user = await unlock("wrong-pin");
+    serveAdmin(() => ({ status: 400, json: { error: "Unknown match" } }));
+    const user = await unlock("admin-pin");
 
     await user.click(screen.getByRole("button", { name: "1" }));
 
-    expect(await screen.findByText("Save failed: Admin PIN required")).toBeInTheDocument();
+    expect(await screen.findByText("Save failed: Unknown match")).toBeInTheDocument();
   });
 });

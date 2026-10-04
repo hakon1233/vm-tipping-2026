@@ -20,14 +20,20 @@ export function AdminPage() {
     setStatus("Loaded");
   }
 
+  // The server checks the PIN before the admin controls open.
   async function unlock() {
-    setAdminPin(pinInput);
     setStatus("Loading");
-    await loadState();
+    try {
+      setState(await getAdminState(pinInput));
+    } catch (error) {
+      setStatus(error instanceof ApiError && error.status !== 0 ? (error.serverMessage ?? "Error: " + error.status) : "Error: could not reach server");
+      return;
+    }
+    setAdminPin(pinInput);
+    setStatus("Loaded");
   }
 
-  // The PIN is first checked by the server on a save, so a wrong PIN shows up
-  // here, with the server's reason.
+  // A save shows the server's reason when it is refused.
   async function save(write: (pin: string) => Promise<void>) {
     if (!adminPin) return;
     setStatus("Saving");

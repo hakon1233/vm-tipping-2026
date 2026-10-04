@@ -63,6 +63,15 @@ describe("admin PIN", () => {
     expect((await postResult(app, { "x-admin-pin": "admin-pin" })).status).toBe(200);
   });
 
+  it("is checked when sent to read the admin state, which stays public without it", async () => {
+    const { app } = testApp();
+    const state = (headers: Record<string, string>) => app.request("/api/admin/state", { headers });
+
+    expect((await state({})).status).toBe(200);
+    expect((await state({ "x-admin-pin": "admin-pin" })).status).toBe(200);
+    expect((await state({ "x-admin-pin": "wrong" })).status).toBe(401);
+  });
+
   it("is not accepted in the request body", async () => {
     const { app } = testApp();
     expect((await postResult(app, {}, { adminPin: "admin-pin" })).status).toBe(401);

@@ -72,25 +72,30 @@ export function createApp(options: AppOptions) {
       "content-disposition": 'attachment; filename="VMtipping2026-export.xlsx"'
     });
   });
-  app.get("/api/admin/state", (context) =>
-    context.json({
-      players: store.listPlayers(),
-      teams: store.listTeams(),
-      matches: store.listMatches().map((match) => ({
-        ...match,
-        result: store.getResult(match.id)?.outcome ?? null
-      })),
-      scoring: store.getScoring(),
-      knockout: Object.fromEntries(
-        ["r32", "r16", "qf", "sf", "final"].map((round) => [
-          round,
-          store.getActualKnockout(round as KnockoutRound)
-        ])
-      ),
-      champion: store.getActualChampion() ?? null,
-      leaderboard: store.getLeaderboard(),
-      advancement: store.getGroupAdvancement()
-    })
+  // Public: it holds results and standings, never anyone's picks. The admin page
+  // sends its PIN here to check it before unlocking, so a PIN that is sent must match.
+  app.get(
+    "/api/admin/state",
+    (context, next) => (context.req.header("x-admin-pin") === undefined ? next() : auth.requireAdmin(context, next)),
+    (context) =>
+      context.json({
+        players: store.listPlayers(),
+        teams: store.listTeams(),
+        matches: store.listMatches().map((match) => ({
+          ...match,
+          result: store.getResult(match.id)?.outcome ?? null
+        })),
+        scoring: store.getScoring(),
+        knockout: Object.fromEntries(
+          ["r32", "r16", "qf", "sf", "final"].map((round) => [
+            round,
+            store.getActualKnockout(round as KnockoutRound)
+          ])
+        ),
+        champion: store.getActualChampion() ?? null,
+        leaderboard: store.getLeaderboard(),
+        advancement: store.getGroupAdvancement()
+      })
   );
 
   app.post("/api/login", async (context) => {
@@ -222,8 +227,7 @@ export function createApp(options: AppOptions) {
     });
   });
 
-  // Every admin write needs the admin PIN. GET /api/admin/state stays public: it
-  // holds results and standings, never anyone's picks.
+  // Every admin write needs the admin PIN.
   app.post("/api/admin/*", auth.requireAdmin);
 
   app.post("/api/admin/results", async (context) => {

@@ -1,20 +1,15 @@
 import { Check, Crown, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { GroupPickOutcome } from "@vm-tipping-2026/shared";
-import { getAdminState, getPlayerPicks, type AdminState } from "../api";
+import { getAdminState, getPlayerPicks, type AdminState, type PlayerPicks, type PlayerRef } from "../api";
 import { groupLetters, matchesByGroup } from "../lib/tournament";
 import { readSession } from "../session";
 import { BrandEyebrow } from "../ui";
 
 type OverviewMatch = AdminState["matches"][number];
 
-type PlayerPicks = {
-  group: Record<string, GroupPickOutcome>;
-  knockout: Record<string, string[]>;
-};
-
 export function OverviewPage() {
-  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
+  const [players, setPlayers] = useState<PlayerRef[]>([]);
   const [matches, setMatches] = useState<OverviewMatch[]>([]);
   const [knockout, setKnockout] = useState<Record<string, string[]>>({});
   const [champion, setChampion] = useState<string | null>(null);
@@ -42,8 +37,7 @@ export function OverviewPage() {
         await Promise.all(
           state.players.map(async (player) => {
             try {
-              const picks = await getPlayerPicks(session.token, player.id);
-              picksMap[player.id] = { group: picks.group, knockout: picks.knockout };
+              picksMap[player.id] = await getPlayerPicks(session.token, player.id);
             } catch {
               // skip failing player
             }
@@ -145,9 +139,6 @@ export function OverviewPage() {
                   </thead>
                   <tbody>
                     {(groupedMatches[g] ?? []).map((match, i) => {
-                      const correctCount = players.filter(
-                        (p) => allPicks[p.id]?.group[match.id] === match.result
-                      ).length;
                       return (
                         <tr key={match.id} className={`border-b border-ink/5 last:border-0 ${i % 2 === 0 ? "" : "bg-paper/40"}`}>
                           <td className="px-3 py-2 font-bold text-red-700">{match.group}</td>

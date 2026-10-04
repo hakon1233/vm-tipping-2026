@@ -1,9 +1,9 @@
 import { Lock, Pencil, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
-import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick } from "../api";
+import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick, type PlayerRef } from "../api";
 import { renameKnockoutPicks } from "../lib/knockout";
-import { groupLetters, isMatchLocked, matchesByGroup, seedPlayerNames, teamsInGroup } from "../lib/tournament";
+import { type Advancement, groupLetters, isMatchLocked, matchesByGroup, seedPlayerNames, teamsInGroup } from "../lib/tournament";
 import { clearSession, saveSession, useSession, type Session } from "../session";
 import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
 import { KnockoutSection } from "./KnockoutSection";
@@ -12,7 +12,7 @@ const pickOptions: GroupPickOutcome[] = ["1", "X", "2"];
 
 export function PlayerPage() {
   const session = useSession();
-  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
+  const [players, setPlayers] = useState<PlayerRef[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupPicks, setGroupPicks] = useState<Record<string, GroupPickOutcome>>({});
   const [activeGroup, setActiveGroup] = useState<GroupLetter>("A");
@@ -21,9 +21,8 @@ export function PlayerPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
-  const [advancement, setAdvancement] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
-  // The server reports deadlinesDisabled on /api/matches (DEADLINES_DISABLED=1 in
-  // the server .env). While true, the UI skips every pick lock.
+  const [advancement, setAdvancement] = useState<Advancement>({});
+  // From the server (DEADLINES_DISABLED=1): while true no pick locks.
   const [deadlinesDisabled, setDeadlinesDisabled] = useState(false);
   const saveTimers = useRef<Record<string, number>>({});
 
@@ -240,7 +239,7 @@ function LoginScreen({
   onLogin
 }: {
   error: string | null;
-  players: { id: string; name: string }[];
+  players: PlayerRef[];
   onLogin: (name: string, pin: string) => void;
 }) {
   const displayPlayers = players.length > 0 ? players : seedPlayerNames.map((n, i) => ({ id: `player-${i + 1}`, name: n }));

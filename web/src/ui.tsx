@@ -2,9 +2,8 @@ import { Check, RefreshCw } from "lucide-react";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
-// Brand mark + wordmark eyebrow shown in every header. The clay/cream mark and
-// warm clay (#c15f3c) wordmark are the VMT-38 "Claude/Anthropic" brand identity;
-// the icon asset lives in web/public/icon.svg (served under BASE_URL).
+// Brand mark + wordmark shown above every page heading. The icon is
+// web/public/icon.svg, served under BASE_URL.
 const assetBase = import.meta.env.BASE_URL ?? "/";
 
 export function BrandEyebrow() {

@@ -6,17 +6,17 @@ import type { KnockoutRound } from "@vm-tipping-2026/shared";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
+import type { ServerConfig } from "./config.js";
 import { buildExportXlsx } from "./exportXlsx.js";
 import type { AppStore, Scoring } from "./store.js";
 
-type AppOptions = {
-  store: AppStore;
-  adminPin: string;
-  leaguePin: string;
-  now?: () => Date;
-  deadlinesDisabled?: boolean;
-  corsOrigins?: string[];
-};
+// The settings come from ServerConfig; tests may leave out the optional ones
+// and pin the clock with `now`.
+type AppOptions = Pick<ServerConfig, "adminPin" | "leaguePin"> &
+  Partial<Pick<ServerConfig, "deadlinesDisabled" | "corsOrigins">> & {
+    store: AppStore;
+    now?: () => Date;
+  };
 
 const validOutcomes = new Set(["1", "X", "2"]);
 const validRounds = new Set(["r32", "r16", "qf", "sf", "final"]);

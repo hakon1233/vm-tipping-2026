@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { createEmptyKnockoutPicks, writeKnockoutPicks } from "./lib/knockout";
 import { type SentRequest, storeSession, stubFetch } from "./test/fakeFetch";
 
 afterEach(() => {
@@ -87,6 +88,31 @@ describe("Knockout page", () => {
     const restored = await screen.findByLabelText(/champion/i);
     await waitFor(() => expect(restored).toBeEnabled());
     expect(restored).toHaveValue("");
+  });
+
+  it("saves clearing a cached champion even when the saved picks could not be loaded", async () => {
+    const cached = createEmptyKnockoutPicks();
+    cached.champion = "Norway";
+    writeKnockoutPicks(window.localStorage, "Alice", cached);
+    const sentNow = stubFetch((request) => {
+      if (request.path === "/api/matches") return { json: { matches: [], players: [], advancement: {}, deadlinesDisabled: true } };
+      if (request.path.startsWith("/api/picks/")) return { status: 500, json: {} };
+      return { json: { ok: true } };
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const champion = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(champion).toBeEnabled());
+    expect(champion).toHaveValue("Norway");
+
+    await user.selectOptions(champion, "");
+
+    await waitFor(() =>
+      expect(sentNow.filter((request) => request.method === "POST").map((request) => request.body)).toContainEqual({
+        round: "champion",
+        teamName: ""
+      })
+    );
   });
 
   it("flags duplicate picks in the same round with scores-once text", async () => {

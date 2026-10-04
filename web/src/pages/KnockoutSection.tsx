@@ -5,7 +5,6 @@ import {
   type GroupAdvPicks,
   type KnockoutPicks,
   type KnockoutRoundId,
-  createEmptyKnockoutPicks,
   duplicateTeamNamesByRound,
   groupAdvFromServer,
   knockoutPickPayloads,
@@ -41,8 +40,10 @@ export function KnockoutSection({
   const [koSaveState, setKoSaveState] = useState<SaveState>("idle");
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
   const saveTimer = useRef<number | undefined>(undefined);
-  // What the server holds, so a save sends only the rounds that changed.
-  const savedPicks = useRef<KnockoutPicks>(createEmptyKnockoutPicks());
+  // What the server is known to hold, so a save sends the rounds that changed
+  // (cleared ones included). Until the server's picks load, the local copy of
+  // the last load or save stands in for them.
+  const savedPicks = useRef<KnockoutPicks>(picks);
 
   // The player's own 1st/2nd place pick per group
   const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => readGroupAdvPicks(window.localStorage, session.playerName));

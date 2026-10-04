@@ -7,6 +7,6 @@ import { createStore } from "./store.js";
 const config = readServerConfig(process.env);
 const app = createApp({ ...config, store: createStore({ databasePath: config.databasePath }) });
 
-serve({ fetch: app.fetch, port: config.port }, (info) => {
+serve({ fetch: app.fetch, port: config.port, hostname: "127.0.0.1" }, (info) => {
   console.log(`VM-tipping API listening on http://localhost:${info.port}`);
 });

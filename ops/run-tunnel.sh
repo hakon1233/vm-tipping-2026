@@ -1,31 +1,25 @@
 #!/bin/bash
-# vm-tipping-cloudflared.sh — supervised Cloudflare quick-tunnel for the live app.
+# run-tunnel.sh — supervised Cloudflare quick tunnel for the API (run by launchd, KeepAlive).
 #
-# Runs under launchd (com.vm-tipping.cloudflared, KeepAlive=true). On each start it:
-#   1. Launches `cloudflared tunnel --url http://localhost:3000` and captures the
+# On each start it:
+#   1. Runs `cloudflared tunnel --url http://localhost:$API_PORT` and waits for the
 #      ephemeral *.trycloudflare.com URL.
-#   2. Publishes that URL to the live site two ways:
-#        a) FAST PATH  — pushes config.json straight to the deploy repo's gh-pages
-#           branch via update-tunnel.sh (live site self-heals in ~30s, no rebuild).
-#        b) SLOW PATH  — writes web/public/config.json and pushes to main so the
-#           next CI build keeps the baked-in fallback in sync.
-#   3. Runs a HEALTH WATCHDOG: every WATCH_INTERVAL it curls the tunnel's /health.
-#      A tunnel that is alive-but-not-serving (e.g. wedged on DNS timeouts, edge
-#      connections silently dropped) is treated as DOWN — after FAIL_THRESHOLD
-#      consecutive failures the script kills cloudflared and exits, so launchd
-#      restarts it, a fresh URL is minted and re-published. Zero manual steps.
+#   2. Publishes that URL with update-tunnel.sh, which rewrites config.json on the
+#      deploy repo's gh-pages branch. The site reads config.json at runtime, so it
+#      picks up the new URL within ~30 s without a rebuild.
+#   3. Health-checks the tunnel's /health every WATCH_INTERVAL seconds. A tunnel that
+#      is up but not serving counts as down: after FAIL_THRESHOLD failures in a row
+#      it kills cloudflared and exits, launchd restarts the script, and a fresh URL
+#      is published. (KeepAlive alone only notices a process that exits.)
 #
-# This closes the gap where plain launchd KeepAlive only restarts on process EXIT
-# and never notices a process that is up but no longer serving traffic (VMT-36).
-#
-# Requirements: cloudflared, gh (authed) for the fast path, git+ssh for main push.
+# Requirements: cloudflared, and gh logged in (`gh auth login`) for update-tunnel.sh.
 
 set -uo pipefail
 
-PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+API_PORT="${API_PORT:-3000}"
 LOG_FILE="/tmp/cloudflared-vm-tipping.log"
 CLOUDFLARED="${CLOUDFLARED:-$(command -v cloudflared || echo /opt/homebrew/bin/cloudflared)}"
-GIT="/usr/bin/git"
 
 # Watchdog tuning
 WATCH_INTERVAL="${WATCH_INTERVAL:-30}"   # seconds between health checks
@@ -33,8 +27,6 @@ FAIL_THRESHOLD="${FAIL_THRESHOLD:-3}"    # consecutive failures => declare wedge
 URL_WAIT_SECS="${URL_WAIT_SECS:-60}"     # how long to wait for the URL on startup
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-# launchd does not inherit the interactive ssh-agent; use the macOS keychain socket.
-export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG_FILE"; }
 
@@ -48,7 +40,7 @@ trap cleanup EXIT INT TERM
 log "Starting cloudflared quick tunnel (supervised, watchdog every ${WATCH_INTERVAL}s, threshold ${FAIL_THRESHOLD})"
 
 # --- Start cloudflared in the background, stream its output to the log ---
-"$CLOUDFLARED" tunnel --url http://localhost:3000 >> "$LOG_FILE" 2>&1 &
+"$CLOUDFLARED" tunnel --url "http://localhost:${API_PORT}" >> "$LOG_FILE" 2>&1 &
 CF_PID=$!
 log "cloudflared started (pid $CF_PID)"
 
@@ -70,17 +62,13 @@ log "Tunnel URL: $TUNNEL_URL"
 
 # --- Publish the URL ---
 publish_url() {
-  local url="$1"
-  # gh-pages config.json is the SINGLE source of truth for the live backend hostname.
-  # Push it directly; the live site self-heals in ~30s, no rebuild. The deploy workflow
-  # is configured to never overwrite this file (keep_files + strips it from the bundle),
-  # so a redeploy can no longer clobber it (VMT-11). The old "slow path" that committed
-  # web/public/config.json to main was removed: it only triggered needless deploys and
-  # was itself a clobber source whenever it lagged the live URL.
-  if "$PROJECT_DIR/update-tunnel.sh" "$url" >> "$LOG_FILE" 2>&1; then
-    log "config.json pushed to gh-pages (single source of truth)"
+  # config.json on gh-pages is the single source of truth for the API URL. The
+  # deploy workflow never overwrites it (keep_files, and it strips config.json from
+  # the bundle), so a web redeploy can't clobber it.
+  if "$SCRIPT_DIR/update-tunnel.sh" "$1" >> "$LOG_FILE" 2>&1; then
+    log "config.json pushed to gh-pages"
   else
-    log "WARNING: update-tunnel.sh failed; live site may be stale until next publish"
+    log "WARNING: update-tunnel.sh failed; the site keeps the old URL until the next publish"
   fi
 }
 publish_url "$TUNNEL_URL"

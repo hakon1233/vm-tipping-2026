@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# update-tunnel.sh
-# Update the live tunnel URL without a full rebuild.
-# Usage: ./update-tunnel.sh https://new-url.trycloudflare.com
+# update-tunnel.sh — point the deployed site at a new API URL without a rebuild.
+# Usage: ops/update-tunnel.sh [https://new-url.trycloudflare.com]
 #
-# What it does:
-#   1. Reads the current tunnel URL from the running cloudflared process (or accepts arg)
-#   2. Writes config.json to the gh-pages branch of the deploy repo
-#   3. Pushes it — the Pages site picks it up immediately (no rebuild needed)
+# Writes {"apiBaseUrl": URL} to config.json on the gh-pages branch of DEPLOY_REPO
+# and pushes it. Without an argument it takes the latest URL from run-tunnel.sh's log.
 
 set -euo pipefail
 
@@ -26,7 +23,7 @@ else
 fi
 
 if [ -z "${TUNNEL_URL:-}" ]; then
-  echo "ERROR: Could not detect tunnel URL. Pass it as argument: ./update-tunnel.sh https://xyz.trycloudflare.com"
+  echo "ERROR: Could not detect tunnel URL. Pass it as argument: ops/update-tunnel.sh https://xyz.trycloudflare.com"
   exit 1
 fi
 
@@ -47,8 +44,8 @@ git ${GIT_AUTH[@]+"${GIT_AUTH[@]}"} clone --depth 1 --branch gh-pages "$CLONE_UR
 echo "{\"apiBaseUrl\":\"${TUNNEL_URL}\"}" > "$WORK_DIR/repo/config.json"
 
 cd "$WORK_DIR/repo"
-git config user.email "ceo@vm-tipping.local"
-git config user.name "VM-tipping CEO"
+git config user.email "tunnel@vm-tipping.local"
+git config user.name "vm-tipping tunnel"
 git add config.json
 git diff --cached --quiet && { echo "No change needed (URL unchanged)."; exit 0; }
 git commit -m "chore: update tunnel URL to ${TUNNEL_URL}"

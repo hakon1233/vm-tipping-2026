@@ -12,7 +12,7 @@ name: Deploy web to GitHub Pages
 #     VITE_API_BASE_URL the permanent API URL baked into the bundle as a fallback.
 #                       The SPA overrides this at runtime from /config.json, so a
 #                       tunnel restart does NOT require a rebuild — only config.json
-#                       needs updating (scripts/start-tunnel.sh does this automatically).
+#                       needs updating (ops/run-tunnel.sh does this automatically).
 #   Repo secrets (Settings → Secrets and variables → Actions → Secrets):
 #     DEPLOY_TOKEN       a PAT (repo scope) that can push to the public deploy repo
 #
@@ -55,7 +55,7 @@ jobs:
         run: npm run build -w @vm-tipping-2026/shared && npm run build -w web
 
       # The live backend hostname is owned at RUNTIME by config.json on the gh-pages
-      # branch (written by scripts/update-tunnel.sh). The bundle must NOT carry its own
+      # branch (written by ops/update-tunnel.sh). The bundle must NOT carry its own
       # config.json or it would clobber the live value on every redeploy — the exact
       # "breaks on redeploys" symptom (VMT-11). Drop it from the publish dir and tell
       # peaceiris to keep the existing gh-pages config.json. VITE_API_BASE_URL stays as

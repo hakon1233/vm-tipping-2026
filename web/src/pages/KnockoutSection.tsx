@@ -78,35 +78,26 @@ export function KnockoutSection({
 
   function updateGroupAdvPick(group: string, position: 1 | 2, team: string) {
     if (locked) return;
-    setPlayerAdv((current) => {
-      const next = withGroupAdvPick(current, group, position, team);
-      scheduleAdvSave(next);
-      return next;
-    });
+    const next = withGroupAdvPick(playerAdv, group, position, team);
+    setPlayerAdv(next);
+    scheduleAdvSave(next);
+  }
+
+  function updatePicks(next: KnockoutPicks) {
+    if (locked) return;
+    setPicks(next);
+    scheduleSave(next);
   }
 
   function updateRoundPick(roundId: KnockoutRoundId, slotIndex: number, teamName: string) {
-    if (locked) return;
-    setPicks((current) => {
-      const next = {
-        ...current,
-        rounds: {
-          ...current.rounds,
-          [roundId]: current.rounds[roundId].map((pick, index) => (index === slotIndex ? teamName : pick))
-        }
-      };
-      scheduleSave(next);
-      return next;
+    updatePicks({
+      ...picks,
+      rounds: { ...picks.rounds, [roundId]: picks.rounds[roundId].map((pick, index) => (index === slotIndex ? teamName : pick)) }
     });
   }
 
   function updateChampion(teamName: string) {
-    if (locked) return;
-    setPicks((current) => {
-      const next = { ...current, champion: teamName };
-      scheduleSave(next);
-      return next;
-    });
+    updatePicks({ ...picks, champion: teamName });
   }
 
   const completedSlots = knockoutRounds.reduce(

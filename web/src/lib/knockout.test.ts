@@ -242,4 +242,13 @@ describe("picks on the server", () => {
     ]);
     expect(knockoutPickPayloads(saved, saved)).toEqual([]);
   });
+
+  it("reads a damaged or partial local group-advancement copy safely", () => {
+    const storage = memoryStorage();
+    storage.setItem("vm-tipping-2026:group-adv:Alice", '{"A":{"first":"Mexico"},"B":null}');
+    expect(readGroupAdvPicks(storage, "Alice")).toEqual({});
+
+    storage.setItem("vm-tipping-2026:group-adv:Alice", '{"A":{"first":"Mexico"}}');
+    expect(readGroupAdvPicks(storage, "Alice")).toEqual({ A: { first: "Mexico", second: "" } });
+  });
 });

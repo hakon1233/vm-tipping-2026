@@ -239,7 +239,7 @@ export function readGroupAdvPicks(storage: KnockoutStorage, playerName: string):
   const raw = storage.getItem(`${groupAdvStoragePrefix}:${playerName}`);
   if (!raw) return {};
   try {
-    return JSON.parse(raw) as GroupAdvPicks;
+    return groupAdvFromServer(JSON.parse(raw) as Record<string, { first?: string; second?: string }>);
   } catch {
     return {};
   }

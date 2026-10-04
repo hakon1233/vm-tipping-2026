@@ -1,48 +1,29 @@
 import { Check, Crown, LockKeyhole, Save, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import seed from "../../../data/seed.json";
 import { getPlayerPicks, saveGroupAdvancement, saveKnockoutPicks } from "../api";
 import {
-  GroupAdvPicks,
-  KnockoutPickPayload,
-  KnockoutRoundId,
-  KnockoutPicks,
-  createEmptyKnockoutPicks,
+  type GroupAdvPicks,
+  type KnockoutPicks,
+  type KnockoutRoundId,
   duplicateTeamNamesByRound,
+  groupAdvFromServer,
+  knockoutPickPayloads,
+  knockoutPicksFromServer,
   knockoutRounds,
+  knockoutTeamPool,
+  matchupTeams,
+  previousRound,
+  r32Bracket,
+  r32Choice,
+  readGroupAdvPicks,
   readKnockoutPicks,
+  withGroupAdvPick,
+  writeGroupAdvPicks,
   writeKnockoutPicks
 } from "../lib/knockout";
-import { allTeams, groupLetters } from "../lib/tournament";
+import { type Advancement, groupLetters, isKnockoutLocked, seedScoring, teamsInGroup } from "../lib/tournament";
 import type { Session } from "../session";
 import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
-
-type R32Match = { id: string; slot1: string; slot2: string; slot2Groups?: string[] };
-
-function resolveR32Slot(
-  slot: string,
-  slotGroups: string[] | undefined,
-  playerAdv: GroupAdvPicks,
-  adminAdv: Record<string, { first?: string; second?: string; third?: string }>
-): { label: string; options: string[] } {
-  if (slot === "3rd") {
-    const groups = slotGroups ?? [];
-    return {
-      label: `Best 3rd (${groups.join("/")})`,
-      options: groups.flatMap((g) => (seed.groups as Record<string, string[]>)[g] ?? [])
-    };
-  }
-  const pos = parseInt(slot[0]);
-  const group = slot.slice(1);
-  const adminTeam = pos === 1 ? adminAdv[group]?.first : adminAdv[group]?.second;
-  const playerTeam = pos === 1 ? playerAdv[group]?.first : playerAdv[group]?.second;
-  const resolved = adminTeam ?? playerTeam;
-  const groupTeams = (seed.groups as Record<string, string[]>)[group] ?? [];
-  return {
-    label: resolved ?? (pos === 1 ? `1st Group ${group}` : `2nd Group ${group}`),
-    options: resolved ? [resolved] : groupTeams
-  };
-}
 
 export function KnockoutSection({
   session,
@@ -50,72 +31,37 @@ export function KnockoutSection({
   deadlinesDisabled
 }: {
   session: Session;
-  advancement: Record<string, { first?: string; second?: string; third?: string }>;
+  advancement: Advancement;
   deadlinesDisabled: boolean;
 }) {
-  const locked = !deadlinesDisabled && Date.now() >= Date.parse(seed.knockoutDeadline);
+  const locked = isKnockoutLocked(deadlinesDisabled);
 
-  // Knockout bracket picks
-  const [picks, setPicks] = useState<KnockoutPicks>(() => {
-    if (typeof window === "undefined") return createEmptyKnockoutPicks();
-    return readKnockoutPicks(window.localStorage, session.playerName);
-  });
+  const [picks, setPicks] = useState<KnockoutPicks>(() => readKnockoutPicks(window.localStorage, session.playerName));
   const [koSaveState, setKoSaveState] = useState<SaveState>("idle");
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
   const saveTimer = useRef<number | undefined>(undefined);
 
-  // Player's group advancement picks (1st/2nd per group)
-  const advKey = `vm-tipping-2026:group-adv:${session.playerName}`;
-  const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => {
-    if (typeof window === "undefined") return {};
-    const raw = localStorage.getItem(advKey);
-    if (!raw) return {};
-    try { return JSON.parse(raw) as GroupAdvPicks; } catch { return {}; }
-  });
+  // The player's own 1st/2nd place pick per group
+  const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => readGroupAdvPicks(window.localStorage, session.playerName));
   const [advSaveState, setAdvSaveState] = useState<SaveState>("idle");
   const advSaveTimer = useRef<number | undefined>(undefined);
 
-  const teamPool = useMemo(() => {
-    const entries = Object.values(advancement);
-    const allGroupsSet = entries.length === 12 && entries.every((e) => e.first && e.second);
-    const advanced = entries.flatMap((entry) =>
-      [entry.first, entry.second, entry.third].filter((t): t is string => Boolean(t))
-    );
-    return allGroupsSet ? advanced.sort() : allTeams;
-  }, [advancement]);
+  const teamPool = useMemo(() => knockoutTeamPool(advancement), [advancement]);
 
-  // VMT-12: load knockout picks + group advancement from server (server is authoritative)
+  // The server is authoritative; localStorage is only a cache.
   useEffect(() => {
     getPlayerPicks(session.token, session.playerId)
       .then((payload) => {
-        const serverPicks: KnockoutPicks = {
-          champion: payload.knockout.champion?.[0] ?? "",
-          rounds: knockoutRounds.reduce(
-            (acc, r) => ({
-              ...acc,
-              [r.id]: Array.from({ length: r.slotCount }, (_, i) => payload.knockout[r.id]?.[i] ?? "")
-            }),
-            {} as Record<KnockoutRoundId, string[]>
-          )
-        };
-        setPicks(serverPicks);
-        writeKnockoutPicks(window.localStorage, session.playerName, serverPicks);
-        const serverAdv: GroupAdvPicks = {};
-        for (const [g, v] of Object.entries(payload.groupAdvancement)) {
-          serverAdv[g] = { first: v.first ?? "", second: v.second ?? "" };
-        }
-        setPlayerAdv(serverAdv);
-        localStorage.setItem(advKey, JSON.stringify(serverAdv));
+        setPicks(knockoutPicksFromServer(payload.knockout));
+        setPlayerAdv(groupAdvFromServer(payload.groupAdvancement));
       })
       .catch(() => {});
   }, [session.playerId]);
 
-  // Persist group advancement picks to localStorage on change
   useEffect(() => {
-    localStorage.setItem(advKey, JSON.stringify(playerAdv));
-  }, [playerAdv, advKey]);
+    writeGroupAdvPicks(window.localStorage, session.playerName, playerAdv);
+  }, [playerAdv, session.playerName]);
 
-  // Persist knockout picks to localStorage on change
   useEffect(() => {
     writeKnockoutPicks(window.localStorage, session.playerName, picks);
   }, [picks, session.playerName]);
@@ -129,11 +75,7 @@ export function KnockoutSection({
 
   async function saveToServer(updatedPicks: KnockoutPicks) {
     try {
-      const payloads: KnockoutPickPayload[] = knockoutRounds
-        .filter((r) => updatedPicks.rounds[r.id].some(Boolean))
-        .map((r) => ({ round: r.id, teamNames: updatedPicks.rounds[r.id].filter(Boolean) }));
-      if (updatedPicks.champion) payloads.push({ round: "champion", teamName: updatedPicks.champion });
-      await saveKnockoutPicks(session.token, payloads);
+      await saveKnockoutPicks(session.token, knockoutPickPayloads(updatedPicks));
       setKoSaveState("saved");
       window.setTimeout(() => setKoSaveState("idle"), 1200);
     } catch {
@@ -161,17 +103,7 @@ export function KnockoutSection({
   function updateGroupAdvPick(group: string, position: 1 | 2, team: string) {
     if (locked) return;
     setPlayerAdv((current) => {
-      // VMT-27: 1st and 2nd must be distinct — if the new pick collides with the
-      // other position, clear that position so the same team can't occupy two R32 slots.
-      const other = position === 1 ? (current[group]?.second ?? "") : (current[group]?.first ?? "");
-      const collides = Boolean(team) && team === other;
-      const next = {
-        ...current,
-        [group]: {
-          first: position === 1 ? team : collides ? "" : (current[group]?.first ?? ""),
-          second: position === 2 ? team : collides ? "" : (current[group]?.second ?? "")
-        }
-      };
+      const next = withGroupAdvPick(current, group, position, team);
       scheduleAdvSave(next);
       return next;
     });
@@ -207,25 +139,6 @@ export function KnockoutSection({
   );
   const totalSlots = knockoutRounds.reduce((total, round) => total + round.slotCount, 1);
   const completedAdvGroups = groupLetters.filter((g) => playerAdv[g]?.first && playerAdv[g]?.second).length;
-
-  const r32Bracket = seed.r32Bracket as unknown as R32Match[];
-
-  // Which two slots from the prior round feed each slot in the current round.
-  // R32 (16 slots) → R16 (8 slots): pairs [0,1], [2,3], …
-  // R16 (8 slots)  → QF  (4 slots): pairs [0,1], [2,3], …
-  // QF  (4 slots)  → SF  (2 slots): pairs [0,1], [2,3]
-  // SF  (2 slots)  → Final (1 slot): [0,1]
-  function getMatchupTeams(roundId: KnockoutRoundId, slotIndex: number): [string, string] {
-    const prevRoundId: KnockoutRoundId | null =
-      roundId === "r16" ? "r32" :
-      roundId === "qf"  ? "r16" :
-      roundId === "sf"  ? "qf"  :
-      roundId === "final" ? "sf" : null;
-    if (!prevRoundId) return ["", ""];
-    const a = picks.rounds[prevRoundId][slotIndex * 2] ?? "";
-    const b = picks.rounds[prevRoundId][slotIndex * 2 + 1] ?? "";
-    return [a, b];
-  }
 
   return (
     <>
@@ -266,7 +179,7 @@ export function KnockoutSection({
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {groupLetters.map((group) => {
-            const teams = seed.groups[group] as string[];
+            const teams = teamsInGroup(group);
             const firstPick = playerAdv[group]?.first ?? "";
             const secondPick = playerAdv[group]?.second ?? "";
             return (
@@ -350,17 +263,14 @@ export function KnockoutSection({
                   <p className="font-black text-lime">{round.shortLabel}</p>
                   <h2 className="mt-1 text-xl font-bold">{round.label}</h2>
                 </div>
-                <span className="rounded-full border border-white/20 px-3 py-1 text-sm font-bold">{seed.scoring[round.pointsKey]} pts</span>
+                <span className="rounded-full border border-white/20 px-3 py-1 text-sm font-bold">{seedScoring[round.pointsKey]} pts</span>
               </div>
 
               <div className="grid gap-3 p-4 sm:grid-cols-2">
                 {round.id === "r32"
                   ? r32Bracket.map((match, slotIndex) => {
-                      const slot1 = resolveR32Slot(match.slot1, undefined, playerAdv, advancement);
-                      const slot2 = resolveR32Slot(match.slot2, match.slot2Groups, playerAdv, advancement);
-                      const allOptions = [...new Set([...slot1.options, ...slot2.options])].sort();
                       const currentPick = picks.rounds[round.id][slotIndex];
-                      const finalOptions = currentPick && !allOptions.includes(currentPick) ? [currentPick, ...allOptions] : allOptions;
+                      const choice = r32Choice(match, playerAdv, advancement, currentPick);
                       const duplicate = Boolean(currentPick && duplicateNames.has(currentPick));
                       return (
                         <label
@@ -373,7 +283,7 @@ export function KnockoutSection({
                         >
                           <span className="text-xs font-bold text-ink/40">{match.id.toUpperCase()}</span>
                           <span className="text-sm font-bold text-ink/80">
-                            {slot1.label} <span className="font-normal text-ink/40">vs</span> {slot2.label}
+                            {choice.home} <span className="font-normal text-ink/40">vs</span> {choice.away}
                           </span>
                           <select
                             aria-label={`${match.id} winner`}
@@ -383,7 +293,7 @@ export function KnockoutSection({
                             onChange={(e) => updateRoundPick(round.id, slotIndex, e.target.value)}
                           >
                             <option value="">Pick winner</option>
-                            {finalOptions.map((t) => (
+                            {choice.options.map((t) => (
                               <option key={t} value={t}>{t}</option>
                             ))}
                           </select>
@@ -398,9 +308,8 @@ export function KnockoutSection({
                       );
                     })
                   : picks.rounds[round.id].map((teamName, slotIndex) => {
-                      const [teamA, teamB] = getMatchupTeams(round.id, slotIndex);
-                      const matchupKnown = Boolean(teamA && teamB);
-                      const matchupOptions = matchupKnown ? [teamA, teamB] : teamPool;
+                      const matchup = matchupTeams(picks, round.id, slotIndex);
+                      const matchupOptions = matchup ?? teamPool;
                       const duplicate = Boolean(teamName && duplicateNames.has(teamName));
                       return (
                         <label
@@ -412,13 +321,13 @@ export function KnockoutSection({
                           key={slotIndex}
                         >
                           <span className="text-xs font-bold text-ink/40">Match {slotIndex + 1}</span>
-                          {matchupKnown ? (
+                          {matchup ? (
                             <span className="text-sm font-bold text-ink/80">
-                              {teamA} <span className="font-normal text-ink/40">vs</span> {teamB}
+                              {matchup[0]} <span className="font-normal text-ink/40">vs</span> {matchup[1]}
                             </span>
                           ) : (
                             <span className="text-sm font-bold text-ink/40 italic">
-                              Pick {round.id === "r16" ? "R32" : round.id === "qf" ? "R16" : round.id === "sf" ? "QF" : "SF"} winners to see matchup
+                              Pick {previousRound(round.id)?.shortLabel} winners to see matchup
                             </span>
                           )}
                           <select

@@ -1,10 +1,9 @@
 import { Lock, Pencil, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import seed from "../../../data/seed.json";
 import type { GroupLetter, GroupPickOutcome, Match } from "@vm-tipping-2026/shared";
 import { ApiError, getMatches, getPlayerPicks, login as requestLogin, renamePlayer, saveGroupPick } from "../api";
 import { renameKnockoutPicks } from "../lib/knockout";
-import { groupLetters } from "../lib/tournament";
+import { groupLetters, isMatchLocked, matchesByGroup, seedPlayerNames, teamsInGroup } from "../lib/tournament";
 import { clearSession, saveSession, useSession, type Session } from "../session";
 import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
 import { KnockoutSection } from "./KnockoutSection";
@@ -57,14 +56,7 @@ export function PlayerPage() {
       });
   }, [session?.playerId]);
 
-  const groupedMatches = useMemo(
-    () =>
-      groupLetters.reduce<Record<GroupLetter, Match[]>>((groups, group) => {
-        groups[group] = matches.filter((match) => match.groupName === group || match.group === group);
-        return groups;
-      }, {} as Record<GroupLetter, Match[]>),
-    [matches]
-  );
+  const groupedMatches = useMemo(() => matchesByGroup(matches), [matches]);
 
   async function login(name: string, pin: string) {
     setError(null);
@@ -108,7 +100,7 @@ export function PlayerPage() {
   }
 
   function queuePickSave(match: Match, pick: GroupPickOutcome) {
-    if (!session || isLocked(match, deadlinesDisabled)) return;
+    if (!session || isMatchLocked(match, deadlinesDisabled)) return;
 
     setGroupPicks((current) => ({ ...current, [match.id]: pick }));
     setSaveState("saving");
@@ -218,7 +210,7 @@ export function PlayerPage() {
         <section className="grid gap-3" aria-label={`Group ${activeGroup} matches`}>
           <div className="rounded-md border border-ink/10 bg-white px-5 py-4 shadow-sm">
             <p className="text-sm font-bold uppercase tracking-normal text-red-700">Group {activeGroup}</p>
-            <h2 className="mt-1 text-xl font-black">{seed.groups[activeGroup].join(" · ")}</h2>
+            <h2 className="mt-1 text-xl font-black">{teamsInGroup(activeGroup).join(" · ")}</h2>
           </div>
           {(groupedMatches[activeGroup] ?? []).map((match) => (
             <GroupMatchRow
@@ -251,7 +243,7 @@ function LoginScreen({
   players: { id: string; name: string }[];
   onLogin: (name: string, pin: string) => void;
 }) {
-  const displayPlayers = players.length > 0 ? players : seed.players.map((n, i) => ({ id: `player-${i + 1}`, name: n }));
+  const displayPlayers = players.length > 0 ? players : seedPlayerNames.map((n, i) => ({ id: `player-${i + 1}`, name: n }));
   const [name, setName] = useState(displayPlayers[0]?.name ?? "");
   const [pin, setPin] = useState("");
 
@@ -318,7 +310,7 @@ function GroupMatchRow({
   deadlinesDisabled: boolean;
   onPick: (pick: GroupPickOutcome) => void;
 }) {
-  const locked = isLocked(match, deadlinesDisabled);
+  const locked = isMatchLocked(match, deadlinesDisabled);
   const kickoff = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -362,9 +354,4 @@ function GroupMatchRow({
       </div>
     </article>
   );
-}
-
-function isLocked(match: Match, deadlinesDisabled: boolean) {
-  if (deadlinesDisabled) return false;
-  return Boolean(match.locked) || Date.now() >= Date.parse(match.kickoffAt);
 }

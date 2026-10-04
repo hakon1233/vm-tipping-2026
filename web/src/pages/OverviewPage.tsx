@@ -1,8 +1,8 @@
 import { Check, Crown, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { GroupLetter, GroupPickOutcome } from "@vm-tipping-2026/shared";
+import type { GroupPickOutcome } from "@vm-tipping-2026/shared";
 import { getAdminState, getPlayerPicks, type AdminState } from "../api";
-import { groupLetters } from "../lib/tournament";
+import { groupLetters, matchesByGroup } from "../lib/tournament";
 import { readSession } from "../session";
 import { BrandEyebrow } from "../ui";
 
@@ -64,14 +64,7 @@ export function OverviewPage() {
     void load();
   }, []);
 
-  const groupedMatches = useMemo(
-    () =>
-      groupLetters.reduce<Record<GroupLetter, OverviewMatch[]>>((groups, g) => {
-        groups[g] = matches.filter((m) => m.group === g);
-        return groups;
-      }, {} as Record<GroupLetter, OverviewMatch[]>),
-    [matches]
-  );
+  const groupedMatches = useMemo(() => matchesByGroup(matches), [matches]);
 
   const pickLabel = (pick: GroupPickOutcome | undefined, result: "1" | "X" | "2" | null) => {
     if (!pick) return { text: "—", cls: "text-ink/25" };

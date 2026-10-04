@@ -1,16 +1,8 @@
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import seed from "../../../data/seed.json";
 import { ApiError, admin, getAdminState, type AdminState } from "../api";
-import { allTeams, groupLetters } from "../lib/tournament";
-
-const adminRounds = [
-  { id: "r32", label: "Round of 32" },
-  { id: "r16", label: "Round of 16" },
-  { id: "qf", label: "Quarter-final" },
-  { id: "sf", label: "Semi-final" },
-  { id: "final", label: "Final" }
-] as const;
+import { knockoutRounds } from "../lib/knockout";
+import { allTeams, groupLetters, teamsInGroup } from "../lib/tournament";
 
 export function AdminPage() {
   const [pinInput, setPinInput] = useState("");
@@ -134,7 +126,7 @@ export function AdminPage() {
                           onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 1, event.target.value))}
                         >
                           <option value="">— not set —</option>
-                          {(seed.groups as Record<string, string[]>)[group]?.map((team) => (
+                          {teamsInGroup(group).map((team) => (
                             <option key={team} value={team}>{team}</option>
                           ))}
                         </select>
@@ -147,7 +139,7 @@ export function AdminPage() {
                           onChange={(event) => event.target.value && save((pin) => admin.saveAdvancement(pin, group, 2, event.target.value))}
                         >
                           <option value="">— not set —</option>
-                          {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first).map((team) => (
+                          {teamsInGroup(group).filter((team) => team !== state.advancement?.[group]?.first).map((team) => (
                             <option key={team} value={team}>{team}</option>
                           ))}
                         </select>
@@ -187,7 +179,7 @@ export function AdminPage() {
                             onChange={(event) => save((pin) => admin.saveAdvancement(pin, group, 3, event.target.value))}
                           >
                             <option value="">{atCap ? "— cap reached (8/8) —" : "— did not advance —"}</option>
-                            {(seed.groups as Record<string, string[]>)[group]?.filter((team) => team !== state.advancement?.[group]?.first && team !== state.advancement?.[group]?.second).map((team) => (
+                            {teamsInGroup(group).filter((team) => team !== state.advancement?.[group]?.first && team !== state.advancement?.[group]?.second).map((team) => (
                               <option key={team} value={team}>{team}</option>
                             ))}
                           </select>
@@ -200,7 +192,7 @@ export function AdminPage() {
 
               <section className="grid gap-4 border border-ink/10 bg-white p-5 shadow-sm">
                 <h2 className="text-2xl font-black">Knockout qualifiers</h2>
-                {adminRounds.map((round) => (
+                {knockoutRounds.map((round) => (
                   <label className="grid gap-2" key={round.id}>
                     <span className="text-sm font-bold text-ink/70">{round.label}</span>
                     <select

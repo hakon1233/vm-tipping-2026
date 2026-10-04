@@ -68,7 +68,7 @@ describe("PlayerPage", () => {
     await user.type(await screen.findByLabelText("League PIN"), "0000");
     await user.click(screen.getByRole("button", { name: "Open picks" }));
 
-    expect(await screen.findByText("Too many wrong PINs. Try again in 15 minutes.")).toBeInTheDocument();
+    expect(await screen.findByText("Too many wrong PINs. Wait a few minutes, then try again.")).toBeInTheDocument();
   });
 
   it("sends a player with an expired session back to login", async () => {

@@ -68,7 +68,7 @@ export function PlayerPage() {
         status === 0
           ? "Could not reach the server. Check your connection."
           : status === 429
-            ? "Too many wrong PINs. Try again in 15 minutes."
+            ? "Too many wrong PINs. Wait a few minutes, then try again."
             : "Name or league PIN was not accepted."
       );
       return;

@@ -58,6 +58,19 @@ describe("PlayerPage", () => {
     expect(window.localStorage.getItem("vm-tipping-session")).toBeNull();
   });
 
+  it("tells a player to wait when the server has paused logins after too many wrong PINs", async () => {
+    servePlayer((request) =>
+      request.path === "/api/login" ? { status: 429, json: { error: "Too many attempts, try again later" } } : undefined
+    );
+    const user = userEvent.setup();
+    render(<PlayerPage />);
+
+    await user.type(await screen.findByLabelText("League PIN"), "0000");
+    await user.click(screen.getByRole("button", { name: "Open picks" }));
+
+    expect(await screen.findByText("Too many wrong PINs. Try again in 15 minutes.")).toBeInTheDocument();
+  });
+
   it("sends a player with an expired session back to login", async () => {
     storeSession();
     servePlayer((request) => (request.path === "/api/picks/p1" ? { status: 401, json: { error: "Login required" } } : undefined));

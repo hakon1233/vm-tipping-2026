@@ -63,10 +63,13 @@ export function PlayerPage() {
     try {
       nextSession = await requestLogin(name, pin);
     } catch (error) {
+      const status = error instanceof ApiError ? error.status : undefined;
       setError(
-        error instanceof ApiError && error.status === 0
+        status === 0
           ? "Could not reach the server. Check your connection."
-          : "Name or league PIN was not accepted."
+          : status === 429
+            ? "Too many wrong PINs. Try again in 15 minutes."
+            : "Name or league PIN was not accepted."
       );
       return;
     }

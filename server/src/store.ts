@@ -4,6 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import seed from "../../data/seed.json" with { type: "json" };
 import { buildGroupMatches, type GroupMatch, type Outcome } from "@vm-tipping-2026/shared";
 
+import { rankPlayers } from "./scoring.js";
+
 export type KnockoutRound = "r32" | "r16" | "qf" | "sf" | "final";
 export type Scoring = typeof seed.scoring;
 type Player = { id: string; name: string };
@@ -272,92 +274,33 @@ export function createStore(options: StoreOptions) {
         return acc;
       }, {});
     },
-    getLeaderboard: () => {
-      const scoring = getScoring();
-      const players = db.prepare("SELECT id, name FROM players ORDER BY id").all() as Player[];
-      const rows = players.map((player) => {
-        const correct = db
-          .prepare(
-            `SELECT COUNT(*) AS total
-             FROM group_picks gp
-             JOIN results r ON r.match_id = gp.match_id AND r.outcome = gp.outcome
-             WHERE gp.player_id = ?`
-          )
-          .get(player.id) as { total: number };
-        const groupPoints = correct.total * scoring.groupGame;
-        const groupAdvPoints = scoreGroupAdvancement(player.id, scoring);
-        const knockout = scoreKnockout(player.id, scoring);
-        return {
-          playerId: player.id,
-          playerName: player.name,
-          name: player.name,
-          groupPoints: groupPoints + groupAdvPoints,
-          ...knockout,
-          knockoutPoints: knockout.r32Points + knockout.r16Points + knockout.qfPoints + knockout.sfPoints + knockout.finalPoints + knockout.championPoints,
-          total:
-            groupPoints +
-            groupAdvPoints +
-            knockout.r32Points +
-            knockout.r16Points +
-            knockout.qfPoints +
-            knockout.sfPoints +
-            knockout.finalPoints +
-            knockout.championPoints,
-          rank: 0
-        };
-      });
-      rows.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
-      let previousTotal: number | undefined;
-      let previousRank = 0;
-      rows.forEach((row, index) => {
-        row.rank = row.total === previousTotal ? previousRank : index + 1;
-        previousTotal = row.total;
-        previousRank = row.rank;
-      });
-      return rows;
-    }
+    getLeaderboard: () =>
+      rankPlayers(
+        store.listPlayers().map((player) => ({
+          ...player,
+          picks: {
+            group: store.getGroupPicks(player.id),
+            advancement: store.getPlayerGroupAdvancement(player.id),
+            knockout: store.getKnockoutPicks(player.id)
+          }
+        })),
+        {
+          results: Object.fromEntries(
+            store.listMatches().flatMap((match) => (match.result ? [[match.id, match.result]] : []))
+          ),
+          advancement: store.getGroupAdvancement(),
+          knockout: {
+            r32: store.getActualKnockout("r32"),
+            r16: store.getActualKnockout("r16"),
+            qf: store.getActualKnockout("qf"),
+            sf: store.getActualKnockout("sf"),
+            final: store.getActualKnockout("final")
+          },
+          champion: store.getActualChampion()
+        },
+        getScoring()
+      )
   };
-
-  function scoreGroupAdvancement(playerId: string, scoring: Scoring): number {
-    const picks = store.getPlayerGroupAdvancement(playerId);
-    const actual = store.getGroupAdvancement();
-    let points = 0;
-    for (const [group, groupPicks] of Object.entries(picks)) {
-      const actualGroup = actual[group];
-      if (!actualGroup) continue;
-      if (groupPicks.first && groupPicks.first === actualGroup.first) points += scoring.groupFirst ?? 0;
-      if (groupPicks.second && groupPicks.second === actualGroup.second) points += scoring.groupSecond ?? 0;
-    }
-    return points;
-  }
-
-  function scoreKnockout(playerId: string, scoring: Scoring) {
-    const pointMap = {
-      r32: scoring.r32Team,
-      r16: scoring.r16Team,
-      qf: scoring.qfTeam,
-      sf: scoring.sfTeam,
-      final: scoring.finalTeam
-    };
-    const roundPoints = {
-      r32Points: 0,
-      r16Points: 0,
-      qfPoints: 0,
-      sfPoints: 0,
-      finalPoints: 0,
-      championPoints: 0
-    };
-    (["r32", "r16", "qf", "sf", "final"] as const).forEach((round) => {
-      const actual = new Set(store.getActualKnockout(round));
-      const picks = new Set((store.getKnockoutPicks(playerId)[round] ?? []) as string[]);
-      const correct = [...picks].filter((team) => actual.has(team)).length;
-      roundPoints[`${round}Points` as keyof typeof roundPoints] = correct * pointMap[round];
-    });
-    const champion = store.getActualChampion();
-    const championPicks = new Set(store.getKnockoutPicks(playerId).champion ?? []);
-    roundPoints.championPoints = champion && championPicks.has(champion) ? scoring.champion : 0;
-    return roundPoints;
-  }
 
   return store;
 }

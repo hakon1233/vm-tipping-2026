@@ -19,13 +19,5 @@
   "devDependencies": {
     "tsx": "^4.21.0",
     "vitest": "^4.0.15"
-  },
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  }
 }

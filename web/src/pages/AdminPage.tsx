@@ -26,6 +26,8 @@ export function AdminPage() {
     try {
       setState(await getAdminState(pinInput));
     } catch (error) {
+      setState(null);
+      setAdminPin("");
       setStatus(error instanceof ApiError && error.status !== 0 ? (error.serverMessage ?? "Error: " + error.status) : "Error: could not reach server");
       return;
     }

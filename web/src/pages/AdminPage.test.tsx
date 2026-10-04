@@ -59,6 +59,18 @@ describe("AdminPage", () => {
     expect(sent.find((request) => request.path === "/api/admin/state")?.headers.get("x-admin-pin")).toBe("guess");
   });
 
+  it("locks again when a later unlock uses a wrong PIN", async () => {
+    serveAdmin();
+    const user = await unlock("admin-pin");
+
+    await user.clear(screen.getByLabelText(/admin pin/i));
+    await user.type(screen.getByLabelText(/admin pin/i), "guess");
+    await user.click(screen.getByRole("button", { name: /unlock admin/i }));
+
+    expect(await screen.findByText("Invalid admin PIN")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /group results/i })).not.toBeInTheDocument();
+  });
+
   it("sends the admin PIN in the x-admin-pin header when saving a result", async () => {
     const sent = serveAdmin();
     const user = await unlock("admin-pin");

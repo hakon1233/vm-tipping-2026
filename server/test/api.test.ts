@@ -275,4 +275,38 @@ describe("VM tipping API", () => {
       rank: 1,
     });
   });
+
+  it("rejects team names that are not in the tournament", async () => {
+    const { app } = testApp();
+    const { session } = await login(app);
+    const asPlayer = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
+    const asAdmin = { "content-type": "application/json", "x-admin-pin": "admin-pin" };
+
+    const requests: [string, Record<string, string>, object][] = [
+      ["/api/picks", asPlayer, { round: "r32", teamNames: ["Mexico", "Atlantis"] }],
+      ["/api/picks", asPlayer, { round: "champion", teamName: "Atlantis" }],
+      ["/api/admin/knockout", asAdmin, { round: "r32", teams: ["Atlantis"] }],
+      ["/api/admin/champion", asAdmin, { team: "Atlantis" }],
+      ["/api/admin/advancement", asAdmin, { group: "A", position: 3, team: "Atlantis" }],
+    ];
+    for (const [path, headers, body] of requests) {
+      const response = await app.request(path, { method: "POST", headers, body: JSON.stringify(body) });
+      expect(response.status, path).toBe(400);
+    }
+  });
+
+  it("only stores known scoring keys", async () => {
+    const { app } = testApp();
+
+    const response = await app.request("/api/admin/scoring", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-pin": "admin-pin" },
+      body: JSON.stringify({ scoring: { champion: 10, bogus: 5 } }),
+    });
+
+    expect(response.status).toBe(200);
+    const { scoring } = await response.json();
+    expect(scoring.champion).toBe(10);
+    expect(scoring).not.toHaveProperty("bogus");
+  });
 });

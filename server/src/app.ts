@@ -28,6 +28,7 @@ export function createApp(options: AppOptions) {
   const deadlinesDisabled = options.deadlinesDisabled ?? false;
   const auth = createAuth({ store, adminPin, leaguePin, now });
   const picksArePublic = () => now().getTime() >= Date.parse(seed.groupStageDeadline);
+  const areTeams = (names: unknown[]) => names.every((name) => typeof name === "string" && store.hasTeam(name));
   const app = new Hono<{ Variables: AuthVariables }>();
 
   app.use(secureHeaders());
@@ -132,11 +133,13 @@ export function createApp(options: AppOptions) {
     }
 
     if (body.round === "champion" && body.teamName) {
+      if (!areTeams([body.teamName])) return context.json({ error: "Unknown team" }, 400);
       store.saveKnockoutPick({ playerId, round: "champion", teams: [body.teamName] });
       return context.json({ ok: true });
     }
 
     if (body.round && validRounds.has(body.round) && Array.isArray(body.teamNames)) {
+      if (!areTeams(body.teamNames)) return context.json({ error: "Unknown team" }, 400);
       store.saveKnockoutPick({ playerId, round: body.round, teams: body.teamNames });
       return context.json({ ok: true });
     }
@@ -239,7 +242,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/admin/knockout", async (context) => {
     const body = await context.req.json<{ round?: string; teams?: string[]; teamNames?: string[] }>();
     const teams = body.teams ?? body.teamNames;
-    if (!validRounds.has(body.round ?? "") || !Array.isArray(teams)) {
+    if (!validRounds.has(body.round ?? "") || !Array.isArray(teams) || !areTeams(teams)) {
       return context.json({ error: "Invalid knockout payload" }, 400);
     }
 
@@ -254,6 +257,7 @@ export function createApp(options: AppOptions) {
       store.clearActualChampion();
       return context.json({ ok: true, champion: null });
     }
+    if (!areTeams([team])) return context.json({ error: "Unknown team" }, 400);
 
     store.saveActualChampion(team);
     return context.json({ ok: true, champion: store.getActualChampion() });
@@ -263,7 +267,7 @@ export function createApp(options: AppOptions) {
     const body = await context.req.json<{ group?: string; position?: number; team?: string }>();
     const group = body.group?.toUpperCase();
     const position = body.position;
-    if (!group || (position !== 1 && position !== 2 && position !== 3)) {
+    if (!group || (position !== 1 && position !== 2 && position !== 3) || (body.team && !areTeams([body.team]))) {
       return context.json({ error: "Invalid advancement payload" }, 400);
     }
     try {

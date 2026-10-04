@@ -309,4 +309,19 @@ describe("VM tipping API", () => {
     expect(scoring.champion).toBe(10);
     expect(scoring).not.toHaveProperty("bogus");
   });
+
+  it("clears a player's champion and knockout round when they send an empty pick", async () => {
+    const { app } = testApp(new Date("2026-06-01T12:00:00.000Z"));
+    const { session } = await login(app);
+    const headers = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
+    const save = (body: object) => app.request("/api/picks", { method: "POST", headers, body: JSON.stringify(body) });
+
+    await save({ round: "champion", teamName: "Mexico" });
+    await save({ round: "r16", teamNames: ["Mexico"] });
+    expect((await save({ round: "champion", teamName: "" })).status).toBe(200);
+    expect((await save({ round: "r16", teamNames: [] })).status).toBe(200);
+
+    const picks = await (await app.request("/api/picks/player-1", { headers })).json();
+    expect(picks.knockout).toEqual({});
+  });
 });

@@ -132,9 +132,11 @@ export function createApp(options: AppOptions) {
       return context.json({ error: "Knockout picks are locked" }, 409);
     }
 
-    if (body.round === "champion" && body.teamName) {
-      if (!areTeams([body.teamName])) return context.json({ error: "Unknown team" }, 400);
-      store.saveKnockoutPick({ playerId, round: "champion", teams: [body.teamName] });
+    // An empty champion clears the pick.
+    if (body.round === "champion" && typeof body.teamName === "string") {
+      const teams = body.teamName ? [body.teamName] : [];
+      if (!areTeams(teams)) return context.json({ error: "Unknown team" }, 400);
+      store.saveKnockoutPick({ playerId, round: "champion", teams });
       return context.json({ ok: true });
     }
 

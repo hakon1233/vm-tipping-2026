@@ -3,12 +3,12 @@ import { cors } from "hono/cors";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { buildExportXlsx } from "./exportXlsx.js";
-import { createStore, type AppStore, type KnockoutRound, type Scoring } from "./store.js";
+import type { AppStore, KnockoutRound, Scoring } from "./store.js";
 
 type AppOptions = {
-  store?: AppStore;
-  adminPin?: string;
-  leaguePin?: string;
+  store: AppStore;
+  adminPin: string;
+  leaguePin: string;
   now?: () => Date;
   deadlinesDisabled?: boolean;
 };
@@ -22,22 +22,12 @@ type InjectInput = {
 const validOutcomes = new Set(["1", "X", "2"]);
 const validRounds = new Set(["r32", "r16", "qf", "sf", "final"]);
 
-export function createApp(options: AppOptions = {}) {
-  const store =
-    options.store ??
-    createStore({
-      databasePath: process.env.DATABASE_PATH ?? "data/vm-tipping.sqlite"
-    });
-  const adminPin = options.adminPin ?? process.env.ADMIN_PIN ?? "admin";
-  const leaguePin = options.leaguePin ?? process.env.LEAGUE_PIN ?? "league";
+export function createApp(options: AppOptions) {
+  const { store, adminPin, leaguePin } = options;
   const now = options.now ?? (() => new Date());
-  // VMT-29: founder asked to temporarily lift the pick deadlines ("remove the
-  // deadline stuff for a while"). With DEADLINES_DISABLED=1 in .env the VMT-15
-  // group/knockout pick locks are skipped and the flag is reported on
-  // /api/matches so the web UI unlocks too. To re-enable deadline locking:
-  // remove DEADLINES_DISABLED from .env and restart the server
-  // (launchctl kickstart -k gui/$UID/com.vm-tipping.server). No web redeploy needed.
-  const deadlinesDisabled = options.deadlinesDisabled ?? process.env.DEADLINES_DISABLED === "1";
+  // When set, pick deadlines are skipped and the flag is reported on /api/matches
+  // so the web UI unlocks too; no web redeploy needed to toggle it.
+  const deadlinesDisabled = options.deadlinesDisabled ?? false;
   const app = new Hono();
 
   app.use("/api/*", cors());
@@ -318,8 +308,6 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 }
-
-export const app = createApp({ store: createStore({ databasePath: ":memory:" }) });
 
 function authenticate(authorization: string | undefined, store: AppStore) {
   const token = authorization?.match(/^Bearer (.+)$/)?.[1];

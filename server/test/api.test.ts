@@ -68,7 +68,7 @@ describe("VM tipping API", () => {
     const bad = await app.request("/api/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Nils Erland", pin: "wrong" }),
+      body: JSON.stringify({ name: "Player 9", pin: "wrong" }),
     });
     expect(bad.status).toBe(401);
   });

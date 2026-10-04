@@ -14,7 +14,7 @@ describe("Knockout page", () => {
     window.localStorage.clear();
     window.localStorage.setItem(
       "vm-tipping-session",
-      JSON.stringify({ token: "test-token", playerId: "player-1", playerName: "Bendik" })
+      JSON.stringify({ token: "test-token", playerId: "player-1", playerName: "Alice" })
     );
     vi.stubGlobal(
       "fetch",

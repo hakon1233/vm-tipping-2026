@@ -49,9 +49,9 @@ describe("knockout picks model", () => {
     picks.rounds.final[0] = "Norway";
     picks.champion = "Norway";
 
-    writeKnockoutPicks(localStorageLike, "Bendik", picks);
+    writeKnockoutPicks(localStorageLike, "Alice", picks);
 
-    expect(readKnockoutPicks(localStorageLike, "Bendik")).toEqual(picks);
+    expect(readKnockoutPicks(localStorageLike, "Alice")).toEqual(picks);
   });
 
   it("exposes all seeded teams as selectable options until bracket seed slots exist", () => {

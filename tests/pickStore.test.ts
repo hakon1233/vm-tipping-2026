@@ -6,13 +6,13 @@ describe("pick store", () => {
     const store = createPickStore();
 
     store.savePick({
-      playerName: "Bendik",
+      playerName: "Alice",
       matchId: "A-1",
       pick: "1",
       now: new Date("2026-01-01T12:00:00.000Z"),
     });
 
-    expect(store.getPicks("Bendik")).toEqual({ "A-1": "1" });
+    expect(store.getPicks("Alice")).toEqual({ "A-1": "1" });
   });
 
   it("rejects changes for matches that have kicked off", () => {
@@ -22,7 +22,7 @@ describe("pick store", () => {
 
     expect(() =>
       store.savePick({
-        playerName: "Bendik",
+        playerName: "Alice",
         matchId: "A-1",
         pick: "2",
         now: new Date("2026-06-11T19:00:01.000Z"),

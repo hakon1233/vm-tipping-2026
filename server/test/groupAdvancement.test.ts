@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
 
-// VMT-27: a player's 1st and 2nd advancement picks for a group must be distinct
+// A player's 1st and 2nd advancement picks for a group must be distinct
 // teams from that group — otherwise the same team resolves into two R32 slots
 // (e.g. 1J and 2J) and the rendered bracket shows one team in multiple matchups.
 
@@ -44,7 +44,7 @@ async function postAdvancement(
   });
 }
 
-describe("player group advancement validation (VMT-27)", () => {
+describe("player group advancement validation", () => {
   it("accepts distinct 1st/2nd picks from the same group", async () => {
     const { app } = testApp();
     const { session } = await login(app);
@@ -103,12 +103,10 @@ describe("player group advancement validation (VMT-27)", () => {
   });
 });
 
-// VMT-29: the admin must always be able to edit actual advancement, including
-// swapping 1st/2nd. The VMT-17 guard used to reject any write where the team
-// already held another position, which made swaps impossible from the admin UI
-// ("Save failed" with no path forward). Now the conflicting position is cleared
-// so the write lands and the one-position-per-team invariant still holds.
-describe("admin group advancement editing (VMT-29)", () => {
+// The admin must always be able to edit actual advancement, including swapping
+// 1st and 2nd: a write clears the team's other position instead of failing, so
+// the one-position-per-team rule still holds.
+describe("admin group advancement editing", () => {
   async function postAdminAdvancement(
     app: ReturnType<typeof createApp>,
     body: { group: string; position: number; team: string }

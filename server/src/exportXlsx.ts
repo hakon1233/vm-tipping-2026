@@ -69,7 +69,7 @@ export async function buildExportXlsx(store: AppStore): Promise<Uint8Array> {
     ...players.map((player) => knockoutPicksByPlayer.get(player.id)?.champion?.[0] ?? "")
   ]);
 
-  // --- Group Advancement (app-only data, not in the founder's workbook) ---
+  // --- Group Advancement (app-only data, not in the original spreadsheet) ---
   const advancementSheet = workbook.addWorksheet("Group Advancement");
   advancementSheet.addRow(["Group", "Position", "Actual", ...playerNames]);
   const actualAdvancement = store.getGroupAdvancement();
@@ -85,7 +85,7 @@ export async function buildExportXlsx(store: AppStore): Promise<Uint8Array> {
     }
   }
 
-  // --- Leaderboard: points config block + standings table, founder column order ---
+  // --- Leaderboard: points config block + standings table, in the spreadsheet's column order ---
   const leaderboardSheet = workbook.addWorksheet("Leaderboard");
   leaderboardSheet.addRow(["WORLD CUP 2026 — LEADERBOARD"]);
   leaderboardSheet.addRow([]);

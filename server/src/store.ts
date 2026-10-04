@@ -204,14 +204,13 @@ export function createStore(options: StoreOptions) {
         db.prepare("DELETE FROM group_advancement WHERE group_name = ? AND position = ?").run(group.toUpperCase(), position);
         return;
       }
-      // VMT-17: a team can only hold one position per group. VMT-29: instead of
-      // rejecting the write (which made it impossible for the admin to swap
-      // 1st/2nd when entering real results), clear the conflicting position so
-      // the edit always lands and the invariant still holds.
+      // A team holds at most one position per group. Rather than rejecting the
+      // write (which made swapping 1st and 2nd impossible), clear the team's other
+      // position so the edit always lands and the rule still holds.
       db.prepare(
         "DELETE FROM group_advancement WHERE group_name = ? AND team = ? AND position != ?"
       ).run(group.toUpperCase(), team, position);
-      // VMT-18: cap third-place qualifiers at 8
+      // At most 8 third-placed teams qualify.
       if (position === 3) {
         const existing = db.prepare(
           "SELECT team FROM group_advancement WHERE group_name = ? AND position = 3"

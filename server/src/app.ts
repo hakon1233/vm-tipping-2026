@@ -127,7 +127,7 @@ export function createApp(options: AppOptions) {
       return context.json({ ok: true });
     }
 
-    // VMT-15: lock knockout picks after knockoutDeadline
+    // Knockout picks lock at the knockout deadline.
     if (!deadlinesDisabled && now().getTime() >= Date.parse(seed.knockoutDeadline)) {
       return context.json({ error: "Knockout picks are locked" }, 409);
     }
@@ -145,7 +145,7 @@ export function createApp(options: AppOptions) {
     }
 
     if (body.groupAdvancement && typeof body.groupAdvancement === "object") {
-      // VMT-27: a group's 1st and 2nd picks must be distinct teams from that group.
+      // A group's 1st and 2nd picks must be distinct teams from that group.
       // Without this guard the same team resolves into two R32 slots (e.g. 1J and 2J)
       // and the rendered bracket shows one team in multiple matchups.
       const teamGroups = new Map(store.listTeams().map((team) => [team.name, team.group.toUpperCase()]));

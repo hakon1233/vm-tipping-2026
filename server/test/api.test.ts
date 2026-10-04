@@ -108,7 +108,7 @@ describe("VM tipping API", () => {
     });
   });
 
-  // VMT-16: picks must not be publicly readable via guessable player IDs.
+  // Picks must not be publicly readable via guessable player IDs.
   it("rejects reading picks without a valid session token (Option A)", async () => {
     const { app } = testApp();
     const { player } = await login(app);
@@ -166,7 +166,7 @@ describe("VM tipping API", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "Match is locked" });
   });
 
-  // VMT-29: temporary founder-requested deadline override (DEADLINES_DISABLED=1)
+  // DEADLINES_DISABLED=1 lifts the pick deadlines.
   it("accepts group and knockout picks after the deadline when deadlines are disabled", async () => {
     const { app } = testApp(new Date("2026-06-12T19:00:00.000Z"), { deadlinesDisabled: true });
     const { session } = await login(app);

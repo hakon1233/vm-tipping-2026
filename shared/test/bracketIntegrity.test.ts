@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import seed from "../../data/seed.json" with { type: "json" };
 
-// VMT-27: the R32 bracket must be a valid single-elimination draw — every team
+// The R32 bracket must be a valid single-elimination draw — every team
 // (slot) appears in exactly one matchup. This guard fails loudly if the seed
 // ever regresses to a bracket where a slot or team is duplicated.
 
@@ -12,7 +12,7 @@ const bracket = seed.r32Bracket as R32Match[];
 const groups = seed.groups as Record<string, string[]>;
 const groupLetters = Object.keys(groups);
 
-describe("seed bracket integrity (VMT-27)", () => {
+describe("seed bracket integrity", () => {
   it("has 12 groups of 4 with 48 distinct teams (no team in two groups)", () => {
     expect(groupLetters).toHaveLength(12);
     const allTeams = groupLetters.flatMap((g) => groups[g]);

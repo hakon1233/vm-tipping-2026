@@ -84,7 +84,7 @@ describe("GET /api/export.xlsx", () => {
     ]);
     // 72 games + header
     expect(groupSheet.actualRowCount).toBe(73);
-    // Founder row order for group A: 1v2, 1v3, 1v4, 2v3, 2v4, 3v4
+    // Spreadsheet row order for group A: 1v2, 1v3, 1v4, 2v3, 2v4, 3v4
     expect(groupSheet.getRow(2).getCell(3).value).toBe("Mexico");
     expect(groupSheet.getRow(2).getCell(4).value).toBe("South Africa");
     expect(groupSheet.getRow(3).getCell(3).value).toBe("Mexico");
@@ -98,7 +98,7 @@ describe("GET /api/export.xlsx", () => {
     const app = testApp(clock);
     const { session } = await login(app);
 
-    // Player 1 picks "1" for A-1 (Mexico vs South Africa, founder row 1 of group A)
+    // Player 1 picks "1" for A-1 (Mexico vs South Africa, spreadsheet row 1 of group A)
     const pickResponse = await app.request("/api/picks", {
       method: "POST",
       headers: {

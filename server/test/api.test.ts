@@ -301,13 +301,14 @@ describe("VM tipping API", () => {
     const response = await app.request("/api/admin/scoring", {
       method: "POST",
       headers: { "content-type": "application/json", "x-admin-pin": "admin-pin" },
-      body: JSON.stringify({ scoring: { champion: 10, bogus: 5 } }),
+      body: JSON.stringify({ scoring: { champion: 10, bogus: 5, toString: 3 } }),
     });
 
     expect(response.status).toBe(200);
     const { scoring } = await response.json();
     expect(scoring.champion).toBe(10);
     expect(scoring).not.toHaveProperty("bogus");
+    expect(Object.keys(scoring)).not.toContain("toString");
   });
 
   it("clears a player's champion and knockout round when they send an empty pick", async () => {

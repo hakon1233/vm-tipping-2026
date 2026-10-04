@@ -240,7 +240,7 @@ export function createStore(options: StoreOptions) {
         "INSERT INTO scoring (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
       );
       Object.entries(scoring).forEach(([key, value]) => {
-        if (key in seed.scoring && typeof value === "number" && Number.isFinite(value) && value >= 0) insert.run(key, value);
+        if (Object.hasOwn(seed.scoring, key) && typeof value === "number" && Number.isFinite(value) && value >= 0) insert.run(key, value);
       });
     },
     getScoring,

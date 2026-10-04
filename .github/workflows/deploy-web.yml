@@ -2,6 +2,7 @@ name: Deploy web to GitHub Pages
 
 # Builds web/ and publishes it to the gh-pages branch of a separate deploy repo
 # that serves it on GitHub Pages. Setup and the runtime config.json: ops/README.md.
+# Only the deploy job sees DEPLOY_TOKEN, and it runs no npm code.
 
 on:
   push:
@@ -13,7 +14,6 @@ on:
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
-# The job only reads this repo; it pushes to the deploy repo with DEPLOY_TOKEN.
 permissions:
   contents: read
 
@@ -21,15 +21,16 @@ jobs:
   check:
     uses: ./.github/workflows/ci.yml
 
-  build-and-deploy:
+  build:
     needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -49,12 +50,28 @@ jobs:
       - name: Strip runtime config.json from bundle (gh-pages owns it)
         run: rm -f ./web/dist/config.json
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-dist
+          path: dist
+
       - name: Publish to the Pages deploy repo
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           personal_token: ${{ secrets.DEPLOY_TOKEN }}
           external_repository: ${{ vars.DEPLOY_REPO || 'hakon1233/vm-tipping-2026-web' }}
           publish_branch: gh-pages
-          publish_dir: ./web/dist
+          publish_dir: ./dist
           keep_files: true
           cname: ${{ vars.PAGES_CNAME }}

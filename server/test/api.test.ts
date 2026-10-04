@@ -109,7 +109,7 @@ describe("VM tipping API", () => {
   });
 
   // Picks must not be publicly readable via guessable player IDs.
-  it("rejects reading picks without a valid session token (Option A)", async () => {
+  it("rejects reading picks without a valid session token", async () => {
     const { app } = testApp();
     const { player } = await login(app);
 

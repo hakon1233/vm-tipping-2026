@@ -121,8 +121,8 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   return (await readJson<{ leaderboard: LeaderboardRow[] }>(request("/api/leaderboard"))).leaderboard ?? [];
 }
 
-// Public: results and standings, never anyone's picks.
-// Public without a PIN; with one, the server rejects a wrong PIN (401).
+// Results and standings, never anyone's picks. Public without a PIN; with one,
+// the server rejects a wrong PIN (401).
 export async function getAdminState(adminPin?: string): Promise<AdminState> {
   const credentials = adminPin === undefined ? undefined : { adminPin };
   return (await (await request("/api/admin/state", { credentials })).json()) as AdminState;

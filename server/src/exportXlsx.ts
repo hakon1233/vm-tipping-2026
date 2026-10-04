@@ -10,7 +10,7 @@ import type { AppStore } from "./store.js";
 // The spreadsheet's Group Stage tab lists each group's six games in this pairing order
 // (1v2, 1v3, 1v4, 2v3, 2v4, 3v4). The app stores matches as G-1..G-6 in a different
 // order, so map spreadsheet row -> app match id suffix.
-const FOUNDER_GAME_ORDER = [1, 3, 5, 6, 4, 2] as const;
+const SPREADSHEET_GAME_ORDER = [1, 3, 5, 6, 4, 2] as const;
 
 const KNOCKOUT_SECTIONS: { round: KnockoutRound; label: string; slots: number; scoringKey: string }[] = [
   { round: "r32", label: "ROUND OF 32", slots: 32, scoringKey: "r32Team" },
@@ -35,7 +35,7 @@ export async function buildExportXlsx(store: AppStore): Promise<Uint8Array> {
   groupSheet.addRow(["Group", "Game", "Team 1", "Team 2", "Result", ...playerNames]);
   const groups = [...new Set(matches.map((match) => match.group))].sort();
   for (const group of groups) {
-    FOUNDER_GAME_ORDER.forEach((suffix, gameIndex) => {
+    SPREADSHEET_GAME_ORDER.forEach((suffix, gameIndex) => {
       const match = matches.find((candidate) => candidate.id === `${group}-${suffix}`);
       if (!match) return;
       groupSheet.addRow([

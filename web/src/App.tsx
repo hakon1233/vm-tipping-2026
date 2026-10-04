@@ -8,7 +8,7 @@ import { useSession } from "./session";
 
 // Hash-based routing so the SPA works on a static host (GitHub Pages) under any
 // base path, with deep links and refresh surviving — no server rewrite rules needed.
-// Routes: #/ → player picks, #/leaderboard → public leaderboard, #/admin → admin.
+// Routes: #/ → player picks, #/leaderboard and #/overview → for logged-in players, #/admin → admin.
 function getRoute(): string {
   const hash = window.location.hash.replace(/^#/, "");
   return (hash || "/").replace(/\/+$/, "") || "/";

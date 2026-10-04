@@ -102,13 +102,15 @@ The access model is a shared league PIN plus an admin PIN. [`SECURITY.md`](SECUR
 
 ## How this was built
 
-I built this with AI coding agents (Claude Code) in June 2026. I wrote the spec ([`SPEC.md`](SPEC.md)) and the scoring rules, reviewed the changes, and ran the league during the tournament.
+The June 2026 build (7–22 June) was done by a team of AI coding agents (Claude Code), coordinated through Paperclip, an agent orchestration tool with its own ticket system. That's where the `VMT-nn` ticket numbers and the Paperclip and Claude co-author lines in the history come from.
 
-In October 2026 a second agent-driven pass prepared the repo for publishing:
+I set the goal and the rules: the spec in [`SPEC.md`](SPEC.md), the scoring and deadlines, and which tickets to run. I tried the app and asked for fixes, and I ran the league for the whole tournament.
+
+In October 2026, agents did a second pass to prepare the repo for publishing, under the same kind of direction:
 
 - security hardening
 - splitting the web app into modules
-- the test suite and one local check script
+- the test suite and a local check script
 - these docs
 
 ## Licence

@@ -57,13 +57,19 @@ export function KnockoutSection({
 
   const teamPool = useMemo(() => knockoutTeamPool(advancement), [advancement]);
 
-  // The server is authoritative; localStorage is only a cache.
+  // Whether the player has changed knockout picks / group advancement since
+  // this page opened.
+  const pickedKnockout = useRef(false);
+  const pickedAdvancement = useRef(false);
+
+  // The server is authoritative; localStorage is only a cache. A change the
+  // player made before the server's copy arrived wins over that copy.
   useEffect(() => {
     getPlayerPicks(session.token, session.playerId)
       .then((payload) => {
         savedPicks.current = knockoutPicksFromServer(payload.knockout);
-        setPicks(savedPicks.current);
-        setPlayerAdv(groupAdvFromServer(payload.groupAdvancement));
+        if (!pickedKnockout.current) setPicks(savedPicks.current);
+        if (!pickedAdvancement.current) setPlayerAdv(groupAdvFromServer(payload.groupAdvancement));
       })
       .catch(() => {});
   }, [session.playerId]);
@@ -79,12 +85,14 @@ export function KnockoutSection({
   function updateGroupAdvPick(group: string, position: 1 | 2, team: string) {
     if (locked) return;
     const next = withGroupAdvPick(playerAdv, group, position, team);
+    pickedAdvancement.current = true;
     setPlayerAdv(next);
     scheduleAdvSave(next);
   }
 
   function updatePicks(next: KnockoutPicks) {
     if (locked) return;
+    pickedKnockout.current = true;
     setPicks(next);
     scheduleSave(next);
   }

@@ -115,6 +115,61 @@ describe("Knockout page", () => {
     );
   });
 
+  // Serves saved picks only once the test calls the returned release.
+  function holdSavedPicks(saved: {
+    knockout: Record<string, string[]>;
+    groupAdvancement: Record<string, { first: string; second: string }>;
+  }) {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    stubFetch(async (request) => {
+      if (request.path === "/api/matches") return { json: { matches: [], players: [], advancement: {}, deadlinesDisabled: true } };
+      if (request.path.startsWith("/api/picks/")) {
+        await held;
+        return { json: { group: {}, ...saved } };
+      }
+      return { json: { ok: true } };
+    });
+    return release;
+  }
+
+  it("keeps a knockout pick made before the saved picks arrive", async () => {
+    const release = holdSavedPicks({
+      knockout: { champion: ["Spain"] },
+      groupAdvancement: { A: { first: "Mexico", second: "South Africa" } }
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const champion = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(champion).toBeEnabled());
+
+    await user.selectOptions(champion, "Norway");
+    release();
+
+    // Group advancement was not touched, so the saved copy shows once it arrives.
+    await waitFor(() => expect(screen.getAllByLabelText("1st place")[0]).toHaveValue("Mexico"));
+    expect(champion).toHaveValue("Norway");
+  });
+
+  it("keeps a group advancement pick made before the saved picks arrive", async () => {
+    const release = holdSavedPicks({
+      knockout: { champion: ["Spain"] },
+      groupAdvancement: { B: { first: "Qatar", second: "Switzerland" } }
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const champion = await screen.findByLabelText(/champion/i);
+    await waitFor(() => expect(champion).toBeEnabled());
+    const groupBFirst = screen.getAllByLabelText("1st place")[1]!;
+
+    await user.selectOptions(groupBFirst, "Canada");
+    release();
+
+    // Knockout picks were not touched, so the saved copy shows once it arrives.
+    await waitFor(() => expect(champion).toHaveValue("Spain"));
+    expect(groupBFirst).toHaveValue("Canada");
+  });
+
   it("flags duplicate picks in the same round with scores-once text", async () => {
     const user = userEvent.setup();
     render(<App />);

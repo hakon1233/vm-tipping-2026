@@ -1,7 +1,8 @@
 import { vi } from "vitest";
 
 // The network is the only thing tests replace: each test answers the app's
-// requests through `fetch` and can inspect what was sent.
+// requests through `fetch` and can inspect what was sent. A reply may be a
+// promise, to hold a response back until the test lets it through.
 export type SentRequest = {
   url: string;
   path: string;
@@ -12,7 +13,7 @@ export type SentRequest = {
 
 export type Reply = { status?: number; json?: unknown } | "network-error";
 
-export function stubFetch(reply: (request: SentRequest) => Reply): SentRequest[] {
+export function stubFetch(reply: (request: SentRequest) => Reply | Promise<Reply>): SentRequest[] {
   const sent: SentRequest[] = [];
   vi.stubGlobal(
     "fetch",
@@ -26,7 +27,7 @@ export function stubFetch(reply: (request: SentRequest) => Reply): SentRequest[]
         body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined
       };
       sent.push(request);
-      const answer = reply(request);
+      const answer = await reply(request);
       if (answer === "network-error") throw new TypeError("Failed to fetch");
       return new Response(JSON.stringify(answer.json ?? {}), {
         status: answer.status ?? 200,

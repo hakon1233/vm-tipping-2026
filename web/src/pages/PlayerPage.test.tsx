@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Reply, type SentRequest, storeSession, stubFetch } from "../test/fakeFetch";
@@ -112,5 +112,76 @@ describe("PlayerPage", () => {
     });
     expect(window.localStorage.getItem("vm-tipping-2026:knockout:Alice")).toBeNull();
     expect(window.localStorage.getItem("vm-tipping-2026:knockout:Alicia")).not.toBeNull();
+  });
+
+  describe("group picks", () => {
+    const matches = [
+      { id: "A-1", round: "group", group: "A", homeTeam: "Mexico", awayTeam: "South Africa", kickoffAt: "2026-06-11T19:00:00.000Z", result: null },
+      { id: "A-2", round: "group", group: "A", homeTeam: "South Korea", awayTeam: "Czech Republic", kickoffAt: "2026-06-11T19:00:00.000Z", result: null }
+    ];
+
+    function serveMatches(onPick: (request: SentRequest) => Reply = () => ({ json: { ok: true } })) {
+      storeSession({ token: "alice-token", playerId: "p1", playerName: "Alice" });
+      return servePlayer((request) => {
+        if (request.path === "/api/matches") return { json: { matches, players, advancement: {}, deadlinesDisabled: true } };
+        if (request.path === "/api/picks" && request.method === "POST") return onPick(request);
+        return undefined;
+      });
+    }
+
+    const pickPosts = (sent: SentRequest[]) =>
+      sent.filter((request) => request.path === "/api/picks" && request.method === "POST").map((request) => request.body);
+
+    async function pick(user: ReturnType<typeof userEvent.setup>, match: string, outcome: string) {
+      const buttons = await screen.findByRole("group", { name: match });
+      await user.click(within(buttons).getByRole("button", { name: outcome }));
+    }
+
+    it("saves a pick and shows that it was saved", async () => {
+      const sent = serveMatches();
+      const user = userEvent.setup();
+      render(<PlayerPage />);
+
+      await pick(user, "Mexico against South Africa", "1");
+
+      expect(await screen.findByText("Saved")).toBeInTheDocument();
+      expect(pickPosts(sent)).toEqual([{ matchId: "A-1", pick: "1" }]);
+    });
+
+    it("saves quick picks on two matches separately, and only the last pick for one match", async () => {
+      const sent = serveMatches();
+      const user = userEvent.setup();
+      render(<PlayerPage />);
+
+      await pick(user, "Mexico against South Africa", "1");
+      await pick(user, "Mexico against South Africa", "2");
+      await pick(user, "South Korea against Czech Republic", "X");
+
+      await waitFor(() => expect(pickPosts(sent)).toHaveLength(2));
+      expect(pickPosts(sent)).toEqual(expect.arrayContaining([{ matchId: "A-1", pick: "2" }, { matchId: "A-2", pick: "X" }]));
+    });
+
+    it("drops a pending pick when the player switches player", async () => {
+      const sent = serveMatches();
+      const user = userEvent.setup();
+      render(<PlayerPage />);
+
+      await pick(user, "Mexico against South Africa", "1");
+      await user.click(screen.getByRole("button", { name: "Switch player" }));
+
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(pickPosts(sent)).toEqual([]);
+    });
+
+    it("says when a match has locked", async () => {
+      serveMatches(() => ({ status: 409, json: { error: "Match is locked" } }));
+      const user = userEvent.setup();
+      render(<PlayerPage />);
+
+      await pick(user, "Mexico against South Africa", "1");
+
+      expect(await screen.findByText("That match has locked.")).toBeInTheDocument();
+      expect(screen.getByText("Save failed")).toBeInTheDocument();
+    });
   });
 });

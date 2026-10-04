@@ -7,6 +7,8 @@ import { defineConfig } from "vite";
 // or leave it unset / "/" for a custom-domain / root deploy.
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
+  // One .env at the repo root serves both the server and the web build.
+  envDir: "..",
   plugins: [react()],
   server: {
     port: 5173

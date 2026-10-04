@@ -76,8 +76,6 @@ export function createAuth({ store, adminPin, leaguePin, now }: AuthOptions) {
   };
 }
 
-export type Auth = ReturnType<typeof createAuth>;
-
 /** Behind the Cloudflare tunnel every request carries the caller's address in cf-connecting-ip. */
 export function clientOf(context: Context): string {
   return (

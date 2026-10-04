@@ -193,7 +193,7 @@ export function knockoutPickPayloads(picks: KnockoutPicks): KnockoutPickPayload[
 // The local copies below are a cache keyed by player name; the server is
 // authoritative and overwrites them when the picks load.
 
-export function knockoutStorageKey(playerName: string): string {
+function knockoutStorageKey(playerName: string): string {
   return `${storagePrefix}:${playerName}`;
 }
 

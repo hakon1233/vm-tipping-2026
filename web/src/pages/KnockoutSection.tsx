@@ -279,7 +279,7 @@ export function KnockoutSection({
         <Trophy size={18} aria-hidden="true" />
         <span>
           {Object.keys(advancement).length > 0
-            ? `Admin has set advancement for ${Object.keys(advancement).length} of 12 groups — R32 matchups show actual teams where known.`
+            ? `Admin has set advancement for ${Object.keys(advancement).length} of ${groupLetters.length} groups — R32 matchups show actual teams where known.`
             : "R32 matchups show your group picks where made, otherwise all teams from that group."}
         </span>
       </footer>

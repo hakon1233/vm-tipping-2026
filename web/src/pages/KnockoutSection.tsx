@@ -23,7 +23,8 @@ import {
 } from "../lib/knockout";
 import { type Advancement, groupLetters, isKnockoutLocked, seedScoring, teamsInGroup } from "../lib/tournament";
 import type { Session } from "../session";
-import { BrandEyebrow, SaveIndicator, type SaveState } from "../ui";
+import { BrandEyebrow, SaveIndicator } from "../ui";
+import { useDebouncedSave } from "../useDebouncedSave";
 
 export function KnockoutSection({
   session,
@@ -37,18 +38,22 @@ export function KnockoutSection({
   const locked = isKnockoutLocked(deadlinesDisabled);
 
   const [picks, setPicks] = useState<KnockoutPicks>(() => readKnockoutPicks(window.localStorage, session.playerName));
-  const [koSaveState, setKoSaveState] = useState<SaveState>("idle");
   const duplicates = useMemo(() => duplicateTeamNamesByRound(picks), [picks]);
-  const saveTimer = useRef<number | undefined>(undefined);
   // What the server is known to hold, so a save sends the rounds that changed
   // (cleared ones included). Until the server's picks load, the local copy of
   // the last load or save stands in for them.
   const savedPicks = useRef<KnockoutPicks>(picks);
+  const [koSaveState, scheduleSave] = useDebouncedSave(async (updated: KnockoutPicks) => {
+    await saveKnockoutPicks(session.token, knockoutPickPayloads(updated, savedPicks.current));
+    savedPicks.current = updated;
+  }, locked);
 
   // The player's own 1st/2nd place pick per group
   const [playerAdv, setPlayerAdv] = useState<GroupAdvPicks>(() => readGroupAdvPicks(window.localStorage, session.playerName));
-  const [advSaveState, setAdvSaveState] = useState<SaveState>("idle");
-  const advSaveTimer = useRef<number | undefined>(undefined);
+  const [advSaveState, scheduleAdvSave] = useDebouncedSave(
+    (updated: GroupAdvPicks) => saveGroupAdvancement(session.token, updated),
+    locked
+  );
 
   const teamPool = useMemo(() => knockoutTeamPool(advancement), [advancement]);
 
@@ -70,41 +75,6 @@ export function KnockoutSection({
   useEffect(() => {
     writeKnockoutPicks(window.localStorage, session.playerName, picks);
   }, [picks, session.playerName]);
-
-  function scheduleSave(updatedPicks: KnockoutPicks) {
-    if (locked) return;
-    window.clearTimeout(saveTimer.current);
-    setKoSaveState("saving");
-    saveTimer.current = window.setTimeout(() => void saveToServer(updatedPicks), 500);
-  }
-
-  async function saveToServer(updatedPicks: KnockoutPicks) {
-    try {
-      await saveKnockoutPicks(session.token, knockoutPickPayloads(updatedPicks, savedPicks.current));
-      savedPicks.current = updatedPicks;
-      setKoSaveState("saved");
-      window.setTimeout(() => setKoSaveState("idle"), 1200);
-    } catch {
-      setKoSaveState("error");
-    }
-  }
-
-  function scheduleAdvSave(updated: GroupAdvPicks) {
-    if (locked) return;
-    window.clearTimeout(advSaveTimer.current);
-    setAdvSaveState("saving");
-    advSaveTimer.current = window.setTimeout(() => void saveAdvToServer(updated), 500);
-  }
-
-  async function saveAdvToServer(updated: GroupAdvPicks) {
-    try {
-      await saveGroupAdvancement(session.token, updated);
-      setAdvSaveState("saved");
-      window.setTimeout(() => setAdvSaveState("idle"), 1200);
-    } catch {
-      setAdvSaveState("error");
-    }
-  }
 
   function updateGroupAdvPick(group: string, position: 1 | 2, team: string) {
     if (locked) return;

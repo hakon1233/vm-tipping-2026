@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import type { KnockoutRound } from "@vm-tipping-2026/shared";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
 import { buildExportXlsx } from "./exportXlsx.js";
-import type { AppStore, KnockoutRound, Scoring } from "./store.js";
+import type { AppStore, Scoring } from "./store.js";
 
 type AppOptions = {
   store: AppStore;

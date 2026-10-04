@@ -2,11 +2,10 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import seed from "../../data/seed.json" with { type: "json" };
-import { buildGroupMatches, type GroupMatch, type Outcome } from "@vm-tipping-2026/shared";
+import { buildGroupMatches, type GroupMatch, type KnockoutRound, type Outcome } from "@vm-tipping-2026/shared";
 
 import { rankPlayers } from "./scoring.js";
 
-export type KnockoutRound = "r32" | "r16" | "qf" | "sf" | "final";
 export type Scoring = typeof seed.scoring;
 type Player = { id: string; name: string };
 type Team = { id: string; name: string; group: string };

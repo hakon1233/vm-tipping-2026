@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
+import type { KnockoutRound } from "@vm-tipping-2026/shared";
 
-import type { AppStore, KnockoutRound } from "./store.js";
+import type { AppStore } from "./store.js";
 
 // Exports live app data as an .xlsx whose tabs/columns mirror the spreadsheet the
 // league used before this app: Group Stage, Knockout, Leaderboard. A "Group

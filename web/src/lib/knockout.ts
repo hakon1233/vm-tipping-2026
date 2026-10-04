@@ -1,10 +1,11 @@
+import type { KnockoutRound as KnockoutRoundId } from "@vm-tipping-2026/shared";
 import seed from "../../../data/seed.json";
 import { allTeams, groupLetters, teamsInGroup, type Advancement } from "./tournament";
 
 // The knockout bracket and a player's picks for it: which teams can go in each
 // slot, how picks are stored locally, and how they travel to and from the server.
 
-export type KnockoutRoundId = "r32" | "r16" | "qf" | "sf" | "final";
+export type { KnockoutRoundId };
 
 export type KnockoutRound = {
   id: KnockoutRoundId;

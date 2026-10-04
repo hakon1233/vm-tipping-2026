@@ -11,6 +11,6 @@ export type {
   Team
 } from "./types.js";
 
-export { buildGroupMatches, buildGroupMatchesFromGroups } from "./groupMatches.js";
+export { buildGroupMatches } from "./groupMatches.js";
 export { isKnockoutRoundId, knockoutRoundIds, knockoutRounds } from "./knockout.js";
 export type { KnockoutRound, KnockoutRoundId } from "./knockout.js";

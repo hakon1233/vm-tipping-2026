@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import { isKnockoutRoundId, knockoutRoundIds, knockoutRounds, type KnockoutRoundId } from "@vm-tipping-2026/shared";
+import { isKnockoutRoundId, knockoutRoundIds, type KnockoutRoundId } from "@vm-tipping-2026/shared";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
@@ -40,17 +40,7 @@ export function createApp(options: AppOptions) {
   app.get("/api/matches", (context) =>
     context.json({
       players: store.listPlayers(),
-      teams: store.listTeams(),
-      matches: store.listMatches().map((match) => ({
-        ...match,
-        round: "group",
-        groupName: match.group,
-        result: store.getResult(match.id)?.outcome ?? null
-      })),
-      knockoutRounds: [
-        ...knockoutRounds.map((round) => ({ id: round.id, label: round.title })),
-        { id: "champion", label: "Champion" }
-      ],
+      matches: store.listMatches(),
       advancement: store.getGroupAdvancement(),
       deadlinesDisabled
     })
@@ -77,10 +67,7 @@ export function createApp(options: AppOptions) {
       context.json({
         players: store.listPlayers(),
         teams: store.listTeams(),
-        matches: store.listMatches().map((match) => ({
-          ...match,
-          result: store.getResult(match.id)?.outcome ?? null
-        })),
+        matches: store.listMatches(),
         scoring: store.getScoring(),
         knockout: Object.fromEntries(
           knockoutRoundIds.map((round) => [round, store.getActualKnockout(round)])

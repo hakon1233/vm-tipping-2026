@@ -30,7 +30,7 @@ describe("admin result flow", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(store.getResult(match.id)?.outcome).toBe("1");
+    expect(store.listMatches().find((candidate) => candidate.id === match.id)?.result).toBe("1");
     expect(store.getLeaderboard()[0]).toMatchObject({
       playerId: player.id,
       groupPoints: 1,

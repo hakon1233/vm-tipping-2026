@@ -43,7 +43,7 @@ export async function buildExportXlsx(store: AppStore): Promise<Uint8Array> {
         gameIndex + 1,
         match.homeTeam,
         match.awayTeam,
-        store.getResult(match.id)?.outcome ?? "",
+        match.result ?? "",
         ...players.map((player) => groupPicksByPlayer.get(player.id)?.[match.id] ?? "")
       ]);
     });

@@ -13,7 +13,7 @@ const PAIRINGS = [
 // All group picks lock at the same real deadline rather than synthetic per-match times.
 const KICKOFF_AT = seed.groupStageDeadline;
 
-export function buildGroupMatchesFromGroups(
+function buildGroupMatchesFromGroups(
   groups: Record<GroupLetter, readonly string[]>
 ): Match[] {
   const matches: Match[] = [];
@@ -26,7 +26,6 @@ export function buildGroupMatchesFromGroups(
         id: `${group}-${pairingIndex + 1}`,
         round: "group",
         group,
-        groupName: group,
         homeTeam: teams[homeIndex],
         awayTeam: teams[awayIndex],
         kickoffAt: KICKOFF_AT

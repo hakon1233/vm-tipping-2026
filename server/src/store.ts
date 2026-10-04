@@ -134,16 +134,6 @@ export function createStore(options: StoreOptions) {
            ORDER BY m.id`
         )
         .all() as unknown as (GroupMatch & { result: Outcome | null })[],
-    getMatch: (id: string) =>
-      db
-        .prepare(
-          "SELECT id, round, group_name AS 'group', home_team AS homeTeam, away_team AS awayTeam, kickoff_at AS kickoffAt FROM matches WHERE id = ?"
-        )
-        .get(id) as GroupMatch | undefined,
-    getResult: (matchId: string) =>
-      db.prepare("SELECT match_id AS matchId, outcome FROM results WHERE match_id = ?").get(matchId) as
-        | { matchId: string; outcome: Outcome }
-        | undefined,
     saveGroupPick: ({ playerId, matchId, outcome }: { playerId: string; matchId: string; outcome: Outcome }) => {
       db.prepare(
         "INSERT INTO group_picks (player_id, match_id, outcome) VALUES (?, ?, ?) ON CONFLICT(player_id, match_id) DO UPDATE SET outcome = excluded.outcome"
@@ -227,13 +217,7 @@ export function createStore(options: StoreOptions) {
       const rows = db.prepare(
         "SELECT group_name, position, team FROM group_advancement ORDER BY group_name, position"
       ).all() as { group_name: string; position: number; team: string }[];
-      return rows.reduce<Record<string, { first?: string; second?: string; third?: string }>>((acc, row) => {
-        if (!acc[row.group_name]) acc[row.group_name] = {};
-        if (row.position === 1) acc[row.group_name].first = row.team;
-        if (row.position === 2) acc[row.group_name].second = row.team;
-        if (row.position === 3) acc[row.group_name].third = row.team;
-        return acc;
-      }, {});
+      return placesByGroup(rows);
     },
     saveScoring: (scoring: Partial<Scoring>) => {
       const insert = db.prepare(
@@ -265,12 +249,7 @@ export function createStore(options: StoreOptions) {
       const rows = db.prepare(
         "SELECT group_name, position, team FROM player_group_advancement WHERE player_id = ? ORDER BY group_name, position"
       ).all(playerId) as { group_name: string; position: number; team: string }[];
-      return rows.reduce<Record<string, { first?: string; second?: string }>>((acc, row) => {
-        if (!acc[row.group_name]) acc[row.group_name] = {};
-        if (row.position === 1) acc[row.group_name].first = row.team;
-        if (row.position === 2) acc[row.group_name].second = row.team;
-        return acc;
-      }, {});
+      return placesByGroup(rows);
     },
     getLeaderboard: () =>
       rankPlayers(
@@ -301,6 +280,14 @@ export function createStore(options: StoreOptions) {
 }
 
 export type AppStore = ReturnType<typeof createStore>;
+
+const PLACES = { 1: "first", 2: "second", 3: "third" } as const;
+
+function placesByGroup(rows: { group_name: string; position: number; team: string }[]) {
+  const byGroup: Record<string, { first?: string; second?: string; third?: string }> = {};
+  for (const row of rows) (byGroup[row.group_name] ??= {})[PLACES[row.position as keyof typeof PLACES]] = row.team;
+  return byGroup;
+}
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

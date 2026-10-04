@@ -53,9 +53,6 @@ export function createAuth({ store, adminPin, leaguePin, now }: AuthOptions) {
       return { ok: true, player, token };
     },
 
-    /** The logged-in player, or undefined for anonymous or expired callers. */
-    playerFor,
-
     requirePlayer: (async (context, next) => {
       const playerId = playerFor(context.req.header("authorization"));
       if (!playerId) return context.json({ error: "Unauthorized" }, 401);

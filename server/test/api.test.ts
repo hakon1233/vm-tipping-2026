@@ -38,24 +38,17 @@ describe("VM tipping API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.players).toHaveLength(8);
-    expect(body.teams).toHaveLength(48);
     expect(body.matches).toHaveLength(72);
-    expect(body.matches[0]).toMatchObject({
+    expect(body.matches[0]).toEqual({
       id: "A-1",
       round: "group",
-      groupName: "A",
+      group: "A",
       homeTeam: "Mexico",
       awayTeam: "South Africa",
+      kickoffAt: "2026-06-11T19:00:00.000Z",
       result: null,
     });
-    expect(body.knockoutRounds.map((round: { id: string }) => round.id)).toEqual([
-      "r32",
-      "r16",
-      "qf",
-      "sf",
-      "final",
-      "champion",
-    ]);
+    expect(Object.keys(body).sort()).toEqual(["advancement", "deadlinesDisabled", "matches", "players"]);
   });
 
   it("validates player login with the shared league PIN", async () => {

@@ -29,12 +29,10 @@ export type Match = {
   id: string;
   round: "group";
   group: GroupLetter;
-  groupName: GroupLetter;
   homeTeam: string;
   awayTeam: string;
   kickoffAt: string;
   result?: GroupPickOutcome | null;
-  locked?: boolean;
 };
 
 export type GroupPick = {

@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
-import { isKnockoutRoundId, knockoutRoundIds, type KnockoutRoundId } from "@vm-tipping-2026/shared";
+import { isKnockoutRoundId, knockoutRoundIds } from "@vm-tipping-2026/shared";
 
-import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
 import type { ServerConfig } from "./config.js";
 import { buildExportXlsx } from "./exportXlsx.js";
+import { createPickRules } from "./picks.js";
 import type { AppStore, Scoring } from "./store.js";
 
 // The settings come from ServerConfig; tests may leave out the optional ones
@@ -27,10 +28,17 @@ export function createApp(options: AppOptions) {
   // so the web UI unlocks too; no web redeploy needed to toggle it.
   const deadlinesDisabled = options.deadlinesDisabled ?? false;
   const auth = createAuth({ store, adminPin, leaguePin, now });
-  const picksArePublic = () => now().getTime() >= Date.parse(seed.groupStageDeadline);
+  const picks = createPickRules({ store, now, deadlinesDisabled });
   const areTeams = (names: unknown[]) => names.every((name) => typeof name === "string" && store.hasTeam(name));
   const app = new Hono<{ Variables: AuthVariables }>();
 
+  // A body that isn't JSON is the caller's mistake, not a server error.
+  app.onError((error, context) => {
+    if (error instanceof HTTPException) return error.getResponse();
+    if (error instanceof SyntaxError) return context.json({ error: "Invalid JSON" }, 400);
+    console.error(error);
+    return context.json({ error: "Internal server error" }, 500);
+  });
   app.use(secureHeaders());
   app.use(bodyLimit({ maxSize: 64 * 1024 }));
   const corsOrigins = options.corsOrigins ?? [];
@@ -49,7 +57,7 @@ export function createApp(options: AppOptions) {
   // Everyone's picks in one workbook, so it follows the same rule as reading
   // another player's picks: a session, and only after the group stage deadline.
   app.get("/api/export.xlsx", auth.requirePlayer, async (context) => {
-    if (!picksArePublic()) {
+    if (!picks.allArePublic()) {
       return context.json({ error: "Picks are private until the group stage deadline" }, 403);
     }
     const file = await buildExportXlsx(store);
@@ -88,80 +96,8 @@ export function createApp(options: AppOptions) {
   });
 
   app.post("/api/picks", auth.requirePlayer, async (context) => {
-    const playerId = context.get("playerId");
-
-    const body = await context.req.json<{
-      matchId?: string;
-      pick?: string;
-      round?: KnockoutRoundId | "champion";
-      teamNames?: string[];
-      teamName?: string;
-      groupAdvancement?: Record<string, { first?: string; second?: string }>;
-    }>();
-
-    if (body.matchId) {
-      const match = store.listMatches().find((candidate) => candidate.id === body.matchId);
-      if (!match || !validOutcomes.has(body.pick ?? "")) {
-        return context.json({ error: "Invalid pick payload" }, 400);
-      }
-      if (!deadlinesDisabled && now().getTime() >= Date.parse(match.kickoffAt)) {
-        return context.json({ error: "Match is locked" }, 409);
-      }
-
-      store.saveGroupPick({ playerId, matchId: body.matchId, outcome: body.pick as "1" | "X" | "2" });
-      return context.json({ ok: true });
-    }
-
-    // Knockout picks lock at the knockout deadline.
-    if (!deadlinesDisabled && now().getTime() >= Date.parse(seed.knockoutDeadline)) {
-      return context.json({ error: "Knockout picks are locked" }, 409);
-    }
-
-    // An empty champion clears the pick.
-    if (body.round === "champion" && typeof body.teamName === "string") {
-      const teams = body.teamName ? [body.teamName] : [];
-      if (!areTeams(teams)) return context.json({ error: "Unknown team" }, 400);
-      store.saveKnockoutPick({ playerId, round: "champion", teams });
-      return context.json({ ok: true });
-    }
-
-    if (isKnockoutRoundId(body.round) && Array.isArray(body.teamNames)) {
-      if (!areTeams(body.teamNames)) return context.json({ error: "Unknown team" }, 400);
-      store.saveKnockoutPick({ playerId, round: body.round, teams: body.teamNames });
-      return context.json({ ok: true });
-    }
-
-    if (body.groupAdvancement && typeof body.groupAdvancement === "object") {
-      // A group's 1st and 2nd picks must be distinct teams from that group.
-      // Without this guard the same team resolves into two R32 slots (e.g. 1J and 2J)
-      // and the rendered bracket shows one team in multiple matchups.
-      const teamGroups = new Map(store.listTeams().map((team) => [team.name, team.group.toUpperCase()]));
-      const stored = store.getPlayerGroupAdvancement(playerId);
-      for (const [group, picks] of Object.entries(body.groupAdvancement)) {
-        const groupKey = group.toUpperCase();
-        for (const team of [picks.first, picks.second]) {
-          if (team && teamGroups.get(team) !== groupKey) {
-            return context.json({ error: `Team "${team}" is not in group ${groupKey}` }, 400);
-          }
-        }
-        const first = picks.first !== undefined ? picks.first : stored[groupKey]?.first;
-        const second = picks.second !== undefined ? picks.second : stored[groupKey]?.second;
-        if (first && second && first === second) {
-          return context.json({ error: `Group ${groupKey}: 1st and 2nd picks must be different teams` }, 400);
-        }
-      }
-      for (const [group, picks] of Object.entries(body.groupAdvancement)) {
-        if (picks.first !== undefined) {
-          store.savePlayerGroupAdvancement({ playerId, group, position: 1, team: picks.first ?? "" });
-        }
-        if (picks.second !== undefined) {
-          store.savePlayerGroupAdvancement({ playerId, group, position: 2, team: picks.second ?? "" });
-        }
-      }
-      return context.json({ ok: true });
-    }
-
-    return context.json({ error: "Invalid pick payload" }, 400);
+    const result = picks.save(context.get("playerId"), await context.req.json());
+    return result.ok ? context.json({ ok: true }) : context.json({ error: result.error }, result.status);
   });
 
   app.patch("/api/player/name", auth.requirePlayer, async (context) => {
@@ -195,7 +131,7 @@ export function createApp(options: AppOptions) {
     // own picks, so logged-in players can't copy each other's strategies early.
     // After the deadline the Overview "house view" shows everyone's picks to any
     // logged-in player.
-    if (!picksArePublic() && sessionPlayerId !== requestedPlayerId) {
+    if (!picks.canRead(sessionPlayerId, requestedPlayerId)) {
       return context.json({ error: "Picks are private until the group stage deadline" }, 403);
     }
 

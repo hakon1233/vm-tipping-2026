@@ -318,4 +318,15 @@ describe("VM tipping API", () => {
     const picks = await (await app.request("/api/picks/player-1", { headers })).json();
     expect(picks.knockout).toEqual({});
   });
+
+  it("answers malformed pick payloads with 400, not a server error", async () => {
+    const { app } = testApp(new Date("2026-06-01T12:00:00.000Z"));
+    const { session } = await login(app);
+    const headers = { authorization: `Bearer ${session.token}`, "content-type": "application/json" };
+
+    for (const body of ['{"groupAdvancement":{"A":null}}', '{"groupAdvancement":{"A":{"first":5}}}', '{"matchId":', "[]"]) {
+      const response = await app.request("/api/picks", { method: "POST", headers, body });
+      expect(response.status, body).toBe(400);
+    }
+  });
 });

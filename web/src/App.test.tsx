@@ -69,52 +69,31 @@ describe("Knockout page", () => {
   });
 });
 
-describe("Admin page", () => {
+describe("Routing", () => {
   beforeEach(() => {
-    window.history.pushState({}, "", "/#/admin");
+    window.localStorage.clear();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
-          teams: [{ name: "Norway" }, { name: "Mexico" }],
-          matches: [
-            {
-              id: "A-1",
-              group: "A",
-              homeTeam: "Mexico",
-              awayTeam: "Norway",
-              result: null
-            }
-          ],
-          scoring: {
-            groupGame: 1,
-            r32Team: 2,
-            r16Team: 3,
-            qfTeam: 4,
-            sfTeam: 5,
-            finalTeam: 6,
-            champion: 7
-          },
-          knockout: { r32: [], r16: [], qf: [], sf: [], final: [] },
-          champion: null,
-          leaderboard: []
-        })
-      }))
+      vi.fn(async () => ({ ok: true, json: async () => ({ matches: [], leaderboard: [] }) }))
     );
   });
 
-  it("PIN-gates admin controls and renders result, knockout, champion, and scoring sections", async () => {
-    const user = userEvent.setup();
+  it("asks for a login before showing the leaderboard", async () => {
+    window.history.pushState({}, "", "/#/leaderboard");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: /admin match room/i })).toBeInTheDocument();
-    await user.type(screen.getByLabelText(/admin pin/i), "admin-pin");
-    await user.click(screen.getByRole("button", { name: /unlock admin/i }));
+    expect(await screen.findByRole("heading", { name: "Player login" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Leaderboard" })).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByRole("heading", { name: /group results/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /knockout qualifiers/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /champion/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /scoring/i })).toBeInTheDocument();
+  it("shows the leaderboard to a logged-in player", async () => {
+    window.localStorage.setItem(
+      "vm-tipping-session",
+      JSON.stringify({ token: "test-token", playerId: "player-1", playerName: "Alice" })
+    );
+    window.history.pushState({}, "", "/#/leaderboard");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Leaderboard" })).toBeInTheDocument();
   });
 });

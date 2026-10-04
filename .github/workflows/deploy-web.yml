@@ -1,23 +1,7 @@
 name: Deploy web to GitHub Pages
 
-# Builds the static SPA in /web and publishes it to the PUBLIC deploy repo
-# (e.g. hakon1233/vm-tipping-2026-web), which serves it on GitHub Pages.
-# Pages is hosted from that separate repo so it owns the gh-pages branch and
-# the runtime config.json, which a tunnel restart rewrites without a rebuild.
-#
-# One-time setup by the founder (see README "Deploy" section):
-#   Repo variables (Settings → Secrets and variables → Actions → Variables):
-#     DEPLOY_REPO       owner/name of the public deploy repo  (default below)
-#     VITE_BASE_PATH    Pages subpath, e.g. /vm-tipping-2026-web/  (default below)
-#     VITE_API_BASE_URL the permanent API URL baked into the bundle as a fallback.
-#                       The SPA overrides this at runtime from /config.json, so a
-#                       tunnel restart does NOT require a rebuild — only config.json
-#                       needs updating (ops/run-tunnel.sh does this automatically).
-#   Repo secrets (Settings → Secrets and variables → Actions → Secrets):
-#     DEPLOY_TOKEN       a PAT (repo scope) that can push to the public deploy repo
-#
-# Then enable GitHub Pages on the PUBLIC repo: Settings → Pages → Deploy from
-# branch → gh-pages / root.
+# Builds web/ and publishes it to the gh-pages branch of a separate deploy repo
+# that serves it on GitHub Pages. Setup and the runtime config.json: ops/README.md.
 
 on:
   push:
@@ -34,7 +18,11 @@ permissions:
   contents: read
 
 jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
   build-and-deploy:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +31,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -54,16 +42,14 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL }}
         run: npm run build -w @vm-tipping-2026/shared && npm run build -w web
 
-      # The live backend hostname is owned at RUNTIME by config.json on the gh-pages
-      # branch (written by ops/update-tunnel.sh). The bundle must NOT carry its own
-      # config.json or it would clobber the live value on every redeploy — the exact
-      # "breaks on redeploys" symptom (VMT-11). Drop it from the publish dir and tell
-      # peaceiris to keep the existing gh-pages config.json. VITE_API_BASE_URL stays as
-      # the in-bundle fallback the SPA uses only if config.json is ever missing.
+      # The API URL lives in config.json on gh-pages (written by ops/update-tunnel.sh).
+      # Don't ship one in the bundle, and keep the existing one (keep_files), so a
+      # redeploy can't point the site at a stale URL. VITE_API_BASE_URL is only the
+      # fallback for when config.json is missing.
       - name: Strip runtime config.json from bundle (gh-pages owns it)
         run: rm -f ./web/dist/config.json
 
-      - name: Publish to public Pages repo
+      - name: Publish to the Pages deploy repo
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           personal_token: ${{ secrets.DEPLOY_TOKEN }}

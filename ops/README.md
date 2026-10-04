@@ -14,7 +14,7 @@ browser ──▶ GitHub Pages (static web app, separate deploy repo)
 
 | Piece | What it does |
 |---|---|
-| `.github/workflows/deploy-web.yml` | On a push to `main` that touches `web/`, `shared/` or `data/seed.json`: builds `web/` and publishes it to the deploy repo's `gh-pages` branch. It keeps the `config.json` already there. |
+| `.github/workflows/deploy-web.yml` | On a push to `main` that touches `web/`, `shared/` or `data/seed.json`: runs the CI checks, then builds `web/` and publishes it to the deploy repo's `gh-pages` branch. It keeps the `config.json` already there. |
 | `ops/run-tunnel.sh` | Starts a quick tunnel to the API, publishes its URL with `update-tunnel.sh`, and restarts itself when `/health` stops answering. |
 | `ops/update-tunnel.sh [url]` | Writes `{"apiBaseUrl": url}` to `config.json` on the deploy repo's `gh-pages` branch. Open tabs pick it up on their next failed request. |
 

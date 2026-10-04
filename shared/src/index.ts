@@ -3,7 +3,6 @@ export type {
   GroupPick,
   GroupPickOutcome,
   GroupPickOutcome as Outcome,
-  KnockoutRound,
   LeaderboardRow,
   Match,
   Match as GroupMatch,
@@ -13,3 +12,5 @@ export type {
 } from "./types.js";
 
 export { buildGroupMatches, buildGroupMatchesFromGroups } from "./groupMatches.js";
+export { isKnockoutRoundId, knockoutRoundIds, knockoutRounds } from "./knockout.js";
+export type { KnockoutRound, KnockoutRoundId } from "./knockout.js";

@@ -1,19 +1,11 @@
-import type { KnockoutRound as KnockoutRoundId } from "@vm-tipping-2026/shared";
+import { knockoutRounds, type KnockoutRound, type KnockoutRoundId } from "@vm-tipping-2026/shared";
 import seed from "../../../data/seed.json";
 import { allTeams, groupLetters, teamsInGroup, type Advancement } from "./tournament";
 
 // The knockout bracket and a player's picks for it: which teams can go in each
 // slot, how picks are stored locally, and how they travel to and from the server.
 
-export type { KnockoutRoundId };
-
-export type KnockoutRound = {
-  id: KnockoutRoundId;
-  label: string;
-  shortLabel: string;
-  slotCount: number;
-  pointsKey: "r32Team" | "r16Team" | "qfTeam" | "sfTeam" | "finalTeam";
-};
+export { knockoutRounds, type KnockoutRound, type KnockoutRoundId };
 
 export type KnockoutPicks = {
   rounds: Record<KnockoutRoundId, string[]>;
@@ -37,14 +29,6 @@ export type KnockoutStorage = {
 // "3rd" (one of the best third-placed teams from slot2Groups).
 export type R32Match = { id: string; slot1: string; slot2: string; slot2Groups?: string[] };
 
-export const knockoutRounds: KnockoutRound[] = [
-  { id: "r32", label: "Round of 32", shortLabel: "R32", slotCount: 16, pointsKey: "r32Team" },
-  { id: "r16", label: "Round of 16", shortLabel: "R16", slotCount: 8, pointsKey: "r16Team" },
-  { id: "qf", label: "Quarter-final", shortLabel: "QF", slotCount: 4, pointsKey: "qfTeam" },
-  { id: "sf", label: "Semi-final", shortLabel: "SF", slotCount: 2, pointsKey: "sfTeam" },
-  { id: "final", label: "Final", shortLabel: "Final", slotCount: 1, pointsKey: "finalTeam" }
-];
-
 export const r32Bracket: R32Match[] = seed.r32Bracket;
 
 const storagePrefix = "vm-tipping-2026:knockout";
@@ -55,7 +39,7 @@ function roundsFrom(saved: (round: KnockoutRoundId) => unknown): Record<Knockout
   return knockoutRounds.reduce(
     (rounds, round) => {
       const savedRound = saved(round.id);
-      rounds[round.id] = Array.from({ length: round.slotCount }, (_, index) => {
+      rounds[round.id] = Array.from({ length: round.matchCount }, (_, index) => {
         const pick: unknown = Array.isArray(savedRound) ? savedRound[index] : undefined;
         return typeof pick === "string" ? pick : "";
       });

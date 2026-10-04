@@ -13,7 +13,6 @@ export type GroupLetter =
   | "L";
 
 export type GroupPickOutcome = "1" | "X" | "2";
-export type KnockoutRound = "r32" | "r16" | "qf" | "sf" | "final";
 
 export type Player = {
   id: string;

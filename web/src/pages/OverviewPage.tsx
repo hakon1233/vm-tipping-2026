@@ -68,10 +68,9 @@ export function OverviewPage() {
     return { text: pick, cls: "text-red-600 line-through" };
   };
 
-  // This page names the rounds in the plural ("Quarter-finals").
   const koRounds = knockoutRounds.map((round) => ({
     id: round.id,
-    label: round.id === "qf" || round.id === "sf" ? `${round.label}s` : round.label,
+    label: round.title,
     pts: seedScoring[round.pointsKey]
   }));
 

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import type { KnockoutRound } from "@vm-tipping-2026/shared";
+import { isKnockoutRoundId, knockoutRoundIds, knockoutRounds, type KnockoutRoundId } from "@vm-tipping-2026/shared";
 
 import seed from "../../data/seed.json" with { type: "json" };
 import { clientOf, createAuth, type AuthVariables } from "./auth.js";
@@ -19,7 +19,6 @@ type AppOptions = Pick<ServerConfig, "adminPin" | "leaguePin"> &
   };
 
 const validOutcomes = new Set(["1", "X", "2"]);
-const validRounds = new Set(["r32", "r16", "qf", "sf", "final"]);
 
 export function createApp(options: AppOptions) {
   const { store, adminPin, leaguePin } = options;
@@ -49,11 +48,7 @@ export function createApp(options: AppOptions) {
         result: store.getResult(match.id)?.outcome ?? null
       })),
       knockoutRounds: [
-        { id: "r32", label: "Round of 32" },
-        { id: "r16", label: "Round of 16" },
-        { id: "qf", label: "Quarter-finals" },
-        { id: "sf", label: "Semi-finals" },
-        { id: "final", label: "Final" },
+        ...knockoutRounds.map((round) => ({ id: round.id, label: round.title })),
         { id: "champion", label: "Champion" }
       ],
       advancement: store.getGroupAdvancement(),
@@ -88,10 +83,7 @@ export function createApp(options: AppOptions) {
         })),
         scoring: store.getScoring(),
         knockout: Object.fromEntries(
-          ["r32", "r16", "qf", "sf", "final"].map((round) => [
-            round,
-            store.getActualKnockout(round as KnockoutRound)
-          ])
+          knockoutRoundIds.map((round) => [round, store.getActualKnockout(round)])
         ),
         champion: store.getActualChampion() ?? null,
         leaderboard: store.getLeaderboard(),
@@ -114,7 +106,7 @@ export function createApp(options: AppOptions) {
     const body = await context.req.json<{
       matchId?: string;
       pick?: string;
-      round?: KnockoutRound | "champion";
+      round?: KnockoutRoundId | "champion";
       teamNames?: string[];
       teamName?: string;
       groupAdvancement?: Record<string, { first?: string; second?: string }>;
@@ -146,7 +138,7 @@ export function createApp(options: AppOptions) {
       return context.json({ ok: true });
     }
 
-    if (body.round && validRounds.has(body.round) && Array.isArray(body.teamNames)) {
+    if (isKnockoutRoundId(body.round) && Array.isArray(body.teamNames)) {
       if (!areTeams(body.teamNames)) return context.json({ error: "Unknown team" }, 400);
       store.saveKnockoutPick({ playerId, round: body.round, teams: body.teamNames });
       return context.json({ ok: true });
@@ -249,12 +241,12 @@ export function createApp(options: AppOptions) {
   app.post("/api/admin/knockout", async (context) => {
     const body = await context.req.json<{ round?: string; teams?: string[]; teamNames?: string[] }>();
     const teams = body.teams ?? body.teamNames;
-    if (!validRounds.has(body.round ?? "") || !Array.isArray(teams) || !areTeams(teams)) {
+    if (!isKnockoutRoundId(body.round) || !Array.isArray(teams) || !areTeams(teams)) {
       return context.json({ error: "Invalid knockout payload" }, 400);
     }
 
-    store.saveActualKnockout(body.round as KnockoutRound, teams);
-    return context.json({ ok: true, teams: store.getActualKnockout(body.round as KnockoutRound) });
+    store.saveActualKnockout(body.round, teams);
+    return context.json({ ok: true, teams: store.getActualKnockout(body.round) });
   });
 
   app.post("/api/admin/champion", async (context) => {

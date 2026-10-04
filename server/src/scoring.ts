@@ -1,4 +1,11 @@
-import type { GroupPickOutcome, KnockoutRound, LeaderboardRow, ScoringConfig } from "@vm-tipping-2026/shared";
+import {
+  knockoutRounds,
+  type GroupPickOutcome,
+  type KnockoutRound,
+  type KnockoutRoundId,
+  type LeaderboardRow,
+  type ScoringConfig
+} from "@vm-tipping-2026/shared";
 
 export type PlayerPicks = {
   /** Match id → predicted outcome. */
@@ -6,26 +13,18 @@ export type PlayerPicks = {
   /** Group letter → predicted 1st and 2nd place. */
   advancement: Record<string, { first?: string; second?: string }>;
   /** Round → teams predicted to reach it; "champion" holds one team. */
-  knockout: Partial<Record<KnockoutRound | "champion", string[]>>;
+  knockout: Partial<Record<KnockoutRoundId | "champion", string[]>>;
 };
 
 /** What really happened, as entered by the admin. */
 export type Actuals = {
   results: Record<string, GroupPickOutcome>;
   advancement: Record<string, { first?: string; second?: string; third?: string }>;
-  knockout: Record<KnockoutRound, string[]>;
+  knockout: Record<KnockoutRoundId, string[]>;
   champion?: string;
 };
 
 export type Standing = LeaderboardRow & { name: string };
-
-const KNOCKOUT_POINTS = {
-  r32: "r32Team",
-  r16: "r16Team",
-  qf: "qfTeam",
-  sf: "sfTeam",
-  final: "finalTeam"
-} as const satisfies Record<KnockoutRound, keyof ScoringConfig>;
 
 /**
  * Scores every player against the actuals and ranks them: highest total first,
@@ -79,17 +78,18 @@ function scoreAdvancement(picks: PlayerPicks, actuals: Actuals, scoring: Scoring
 
 function scoreKnockout(picks: PlayerPicks, actuals: Actuals, scoring: ScoringConfig) {
   const pointsFor = (round: KnockoutRound) => {
-    const reached = new Set(actuals.knockout[round]);
-    const correct = [...new Set(picks.knockout[round] ?? [])].filter((team) => reached.has(team));
-    return correct.length * scoring[KNOCKOUT_POINTS[round]];
+    const reached = new Set(actuals.knockout[round.id]);
+    const correct = [...new Set(picks.knockout[round.id] ?? [])].filter((team) => reached.has(team));
+    return correct.length * scoring[round.pointsKey];
   };
+  const points = Object.fromEntries(knockoutRounds.map((round) => [round.id, pointsFor(round)])) as Record<KnockoutRoundId, number>;
   const champion = actuals.champion;
   return {
-    r32Points: pointsFor("r32"),
-    r16Points: pointsFor("r16"),
-    qfPoints: pointsFor("qf"),
-    sfPoints: pointsFor("sf"),
-    finalPoints: pointsFor("final"),
+    r32Points: points.r32,
+    r16Points: points.r16,
+    qfPoints: points.qf,
+    sfPoints: points.sf,
+    finalPoints: points.final,
     championPoints: champion && picks.knockout.champion?.includes(champion) ? scoring.champion : 0
   };
 }

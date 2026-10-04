@@ -143,7 +143,7 @@ export function KnockoutSection({
     (total, round) => total + picks.rounds[round.id].filter(Boolean).length,
     picks.champion ? 1 : 0
   );
-  const totalSlots = knockoutRounds.reduce((total, round) => total + round.slotCount, 1);
+  const totalSlots = knockoutRounds.reduce((total, round) => total + round.matchCount, 1);
   const completedAdvGroups = groupLetters.filter((g) => playerAdv[g]?.first && playerAdv[g]?.second).length;
 
   return (

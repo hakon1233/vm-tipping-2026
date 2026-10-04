@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { KnockoutRound } from "@vm-tipping-2026/shared";
+import { knockoutRounds } from "@vm-tipping-2026/shared";
 
 import type { AppStore } from "./store.js";
 
@@ -12,13 +12,13 @@ import type { AppStore } from "./store.js";
 // order, so map spreadsheet row -> app match id suffix.
 const SPREADSHEET_GAME_ORDER = [1, 3, 5, 6, 4, 2] as const;
 
-const KNOCKOUT_SECTIONS: { round: KnockoutRound; label: string; slots: number; scoringKey: string }[] = [
-  { round: "r32", label: "ROUND OF 32", slots: 32, scoringKey: "r32Team" },
-  { round: "r16", label: "ROUND OF 16", slots: 16, scoringKey: "r16Team" },
-  { round: "qf", label: "QUARTER-FINALS", slots: 8, scoringKey: "qfTeam" },
-  { round: "sf", label: "SEMI-FINALS", slots: 4, scoringKey: "sfTeam" },
-  { round: "final", label: "FINAL", slots: 2, scoringKey: "finalTeam" }
-];
+// The spreadsheet lists the teams in each round, two per match.
+const KNOCKOUT_SECTIONS = knockoutRounds.map((round) => ({
+  round: round.id,
+  label: round.title.toUpperCase(),
+  slots: round.matchCount * 2,
+  scoringKey: round.pointsKey
+}));
 
 export async function buildExportXlsx(store: AppStore): Promise<Uint8Array> {
   const players = store.listPlayers();

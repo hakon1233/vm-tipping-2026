@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import seed from "../../data/seed.json" with { type: "json" };
-import { buildGroupMatches, type GroupMatch, type KnockoutRound, type Outcome } from "@vm-tipping-2026/shared";
+import { buildGroupMatches, knockoutRoundIds, type GroupMatch, type KnockoutRoundId, type Outcome } from "@vm-tipping-2026/shared";
 
 import { rankPlayers } from "./scoring.js";
 
@@ -157,14 +157,14 @@ export function createStore(options: StoreOptions) {
       return Object.fromEntries(rows.map((row) => [row.matchId, row.outcome])) as Record<string, Outcome>;
     },
     hasTeam: (team: string) => Boolean(db.prepare("SELECT id FROM teams WHERE name = ?").get(team)),
-    saveKnockoutPick: ({ playerId, round, teams }: { playerId: string; round: KnockoutRound | "champion"; teams: string[] }) => {
+    saveKnockoutPick: ({ playerId, round, teams }: { playerId: string; round: KnockoutRoundId | "champion"; teams: string[] }) => {
       db.prepare("DELETE FROM knockout_picks WHERE player_id = ? AND round = ?").run(playerId, round);
       const insert = db.prepare("INSERT INTO knockout_picks (player_id, round, team, position) VALUES (?, ?, ?, ?)");
       [...new Set(teams)].forEach((team, index) => insert.run(playerId, round, team, index));
     },
     getKnockoutPicks: (playerId: string) => {
       const rows = db.prepare("SELECT round, team FROM knockout_picks WHERE player_id = ? ORDER BY round, position").all(playerId) as {
-        round: KnockoutRound | "champion";
+        round: KnockoutRoundId | "champion";
         team: string;
       }[];
       return rows.reduce<Record<string, string[]>>((acc, row) => {
@@ -177,12 +177,12 @@ export function createStore(options: StoreOptions) {
         "INSERT INTO results (match_id, outcome) VALUES (?, ?) ON CONFLICT(match_id) DO UPDATE SET outcome = excluded.outcome"
       ).run(matchId, outcome);
     },
-    saveActualKnockout: (round: KnockoutRound, teams: string[]) => {
+    saveActualKnockout: (round: KnockoutRoundId, teams: string[]) => {
       db.prepare("DELETE FROM knockout_actuals WHERE round = ?").run(round);
       const insert = db.prepare("INSERT INTO knockout_actuals (round, team, position) VALUES (?, ?, ?)");
       [...new Set(teams)].forEach((team, index) => insert.run(round, team, index));
     },
-    getActualKnockout: (round: KnockoutRound) =>
+    getActualKnockout: (round: KnockoutRoundId) =>
       (
         db.prepare("SELECT team FROM knockout_actuals WHERE round = ? ORDER BY position").all(round) as {
           team: string;
@@ -287,13 +287,10 @@ export function createStore(options: StoreOptions) {
             store.listMatches().flatMap((match) => (match.result ? [[match.id, match.result]] : []))
           ),
           advancement: store.getGroupAdvancement(),
-          knockout: {
-            r32: store.getActualKnockout("r32"),
-            r16: store.getActualKnockout("r16"),
-            qf: store.getActualKnockout("qf"),
-            sf: store.getActualKnockout("sf"),
-            final: store.getActualKnockout("final")
-          },
+          knockout: Object.fromEntries(knockoutRoundIds.map((round) => [round, store.getActualKnockout(round)])) as Record<
+            KnockoutRoundId,
+            string[]
+          >,
           champion: store.getActualChampion()
         },
         getScoring()

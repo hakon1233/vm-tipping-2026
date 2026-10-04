@@ -24,6 +24,7 @@ export function createApp(options: AppOptions) {
   // so the web UI unlocks too; no web redeploy needed to toggle it.
   const deadlinesDisabled = options.deadlinesDisabled ?? false;
   const auth = createAuth({ store, adminPin, leaguePin, now });
+  const picksArePublic = () => now().getTime() >= Date.parse(seed.groupStageDeadline);
   const app = new Hono<{ Variables: AuthVariables }>();
 
   app.use("/api/*", cors());
@@ -52,8 +53,12 @@ export function createApp(options: AppOptions) {
     })
   );
   app.get("/api/leaderboard", (context) => context.json({ leaderboard: store.getLeaderboard() }));
-  // VMT-28: download all live data as an Excel workbook matching the founder's sheet layout
-  app.get("/api/export.xlsx", async (context) => {
+  // Everyone's picks in one workbook, so it follows the same rule as reading
+  // another player's picks: a session, and only after the group stage deadline.
+  app.get("/api/export.xlsx", auth.requirePlayer, async (context) => {
+    if (!picksArePublic()) {
+      return context.json({ error: "Picks are private until the group stage deadline" }, 403);
+    }
     const file = await buildExportXlsx(store);
     return context.body(file.buffer as ArrayBuffer, 200, {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -194,7 +199,7 @@ export function createApp(options: AppOptions) {
     // own picks, so logged-in players can't copy each other's strategies early.
     // After the deadline the Overview "house view" shows everyone's picks to any
     // logged-in player.
-    if (now().getTime() < Date.parse(seed.groupStageDeadline) && sessionPlayerId !== requestedPlayerId) {
+    if (!picksArePublic() && sessionPlayerId !== requestedPlayerId) {
       return context.json({ error: "Picks are private until the group stage deadline" }, 403);
     }
 

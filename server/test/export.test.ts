@@ -4,13 +4,20 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
 
-function testApp(now = new Date("2026-01-01T12:00:00.000Z")) {
+const BEFORE_DEADLINE = new Date("2026-06-01T12:00:00.000Z");
+const AFTER_DEADLINE = new Date("2026-06-12T12:00:00.000Z");
+
+function testApp(clock = { now: AFTER_DEADLINE }) {
   return createApp({
     store: createStore({ databasePath: ":memory:" }),
     leaguePin: "league-pin",
     adminPin: "admin-pin",
-    now: () => now
+    now: () => clock.now
   });
+}
+
+function download(app: ReturnType<typeof createApp>, token?: string) {
+  return app.request("/api/export.xlsx", token ? { headers: { authorization: `Bearer ${token}` } } : undefined);
 }
 
 async function login(app: ReturnType<typeof createApp>, name = "Player 1") {
@@ -29,10 +36,22 @@ async function readWorkbook(response: Response) {
   return workbook;
 }
 
-describe("GET /api/export.xlsx (VMT-28)", () => {
-  it("returns an xlsx with the founder's tab layout", async () => {
+describe("GET /api/export.xlsx", () => {
+  it("is not available to anonymous callers", async () => {
+    expect((await download(testApp())).status).toBe(401);
+  });
+
+  it("is not available before the group stage deadline, when picks are still private", async () => {
+    const app = testApp({ now: BEFORE_DEADLINE });
+    const { session } = await login(app);
+
+    expect((await download(app, session.token)).status).toBe(403);
+  });
+
+  it("returns an xlsx with the original spreadsheet's tab layout", async () => {
     const app = testApp();
-    const response = await app.request("/api/export.xlsx");
+    const { session } = await login(app);
+    const response = await download(app, session.token);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("spreadsheetml");
@@ -75,7 +94,8 @@ describe("GET /api/export.xlsx (VMT-28)", () => {
   });
 
   it("exports picks, results, knockout and leaderboard values matching the API", async () => {
-    const app = testApp();
+    const clock = { now: BEFORE_DEADLINE };
+    const app = testApp(clock);
     const { session } = await login(app);
 
     // Player 1 picks "1" for A-1 (Mexico vs South Africa, founder row 1 of group A)
@@ -106,7 +126,8 @@ describe("GET /api/export.xlsx (VMT-28)", () => {
       body: JSON.stringify({ round: "r32", teams: ["Mexico"] })
     });
 
-    const workbook = await readWorkbook(await app.request("/api/export.xlsx"));
+    clock.now = AFTER_DEADLINE;
+    const workbook = await readWorkbook(await download(app, session.token));
 
     const groupSheet = workbook.getWorksheet("Group Stage")!;
     // Row 2 = group A game 1 = match A-1; column 5 result, column 6 Player 1 pick

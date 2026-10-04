@@ -210,6 +210,21 @@ function LeaderboardPage() {
   }, []);
 
   const hasKoData = rows.some((r) => r.knockoutPoints > 0);
+  const session = readSession();
+
+  async function downloadExport(token: string) {
+    const response = await apiFetch("/api/export.xlsx", { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+    if (!response?.ok) {
+      setError("The Excel export could not be downloaded.");
+      return;
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "VMtipping2026-export.xlsx";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -233,15 +248,17 @@ function LeaderboardPage() {
               <RefreshCw size={15} aria-hidden="true" />
               Refresh
             </button>
-            {/* VMT-28: one-click export of picks, results and standings as Excel */}
-            <a
-              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-ink/20 bg-white px-4 text-sm font-bold shadow-sm"
-              href={`${apiBaseUrl}/api/export.xlsx`}
-              download
-            >
-              <Download size={15} aria-hidden="true" />
-              Excel
-            </a>
+            {/* The export holds everyone's picks, so it needs a logged-in player. */}
+            {session ? (
+              <button
+                className="inline-flex min-h-10 items-center gap-2 rounded-md border border-ink/20 bg-white px-4 text-sm font-bold shadow-sm"
+                onClick={() => void downloadExport(session.token)}
+                type="button"
+              >
+                <Download size={15} aria-hidden="true" />
+                Excel
+              </button>
+            ) : null}
           </div>
         </header>
 

@@ -66,4 +66,13 @@ describe("PlayerPage", () => {
     expect(await screen.findByRole("heading", { name: "Player login" })).toBeInTheDocument();
     expect(window.localStorage.getItem("vm-tipping-session")).toBeNull();
   });
+
+  it("shows a schedule error instead of crashing when the match list fails", async () => {
+    storeSession();
+    servePlayer((request) => (request.path === "/api/matches" ? { status: 500, json: { error: "Database locked" } } : undefined));
+    render(<PlayerPage />);
+
+    expect(await screen.findByText("Match schedule could not be loaded.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Group-stage picks" })).toBeInTheDocument();
+  });
 });

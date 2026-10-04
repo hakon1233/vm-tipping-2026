@@ -30,7 +30,10 @@ export function PlayerPage() {
 
   useEffect(() => {
     fetch(`${apiBaseUrl}/api/matches`)
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error("matches fetch failed");
+        return response.json();
+      })
       .then((payload: { matches: Match[]; players?: { id: string; name: string }[]; advancement?: Record<string, { first?: string; second?: string; third?: string }>; deadlinesDisabled?: boolean }) => {
         setDeadlinesDisabled(payload.deadlinesDisabled === true);
         setMatches(payload.matches);
